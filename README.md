@@ -40,22 +40,34 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
 
 ---
 
+## Documentation
+- https://usuaris.tinet.cat/fmco/
+- https://fmcopaco.github.io/
+- Read the [manual](doc/PacoMouseCYD_manual_v0.9.pdf) in the doc directory
+- Step-by-step assembly of PacoMouseCYD by [Isaac](https://www.iguadix.es/content/pacomouse-cyd)
+
+---
+
 ## Schematics
 
   ![Sch](images/schematics.png)
+
+The CYD (Cheap Yellow Display) has the following features:
+
+* ESP32 (With Wifi and Bluetooth)
+* 320 x 240 TFT Display (2.8" ILI9341)
+* Touch Screen (Resistive XPT2046)
+* USB for powering and programming
+* SD Card Slot (max. 32Gb FAT32), LED and some additional pins broken out in JST 1.25 connectors.
+
+
+Just add a rotary encoder type EC-11 or KY-040 with a pushbutton, a battery and its charger to have your **PacoMouseCYD** wireless throttle.
+
 ---
 
 ## Copyright
 Copyright (c) 2025-2026 Paco Cañada, [The Pows](https://usuaris.tinet.cat/fmco/)   
 All rights reserved.
-
----
-
-## Documentation
-- https://usuaris.tinet.cat/fmco/
-- https://fmcopaco.github.io/
-- Read the [manual](doc/PacoMouseCYD_manual_v0.9.pdf) in the doc directory
-- Step-by-step assembly of PacoMouseCYD by [Isaac](https://www.iguadix.es/)
 
 ---
 
