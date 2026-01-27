@@ -1,6 +1,5 @@
 # CYD_USER_DEFINED
 
-> [!IMPORTANT]
 
 > You need to modify the User_Setup.h file according to your board and copy it into the TFT_eSPI library folder.
 In the program's config.h file, select CYD_USER_DEFINED as the hardware and modify the USER DEFINED HARDWARE section according to your board.
@@ -19,6 +18,8 @@ Al fitxer config.h del programa, seleccioneu CYD_USER_DEFINED com a hardware i m
 
 > Sie müssen die Datei User_Setup.h entsprechend Ihrer Platine ändern und in den TFT_eSPI-Bibliotheksordner kopieren.
 Wählen Sie in der Datei config.h des Programms CYD_USER_DEFINED als Hardware aus und passen Sie den Abschnitt USER DEFINED HARDWARE entsprechend Ihrem Board an.
+
+---
 
 <br>
 <br>
