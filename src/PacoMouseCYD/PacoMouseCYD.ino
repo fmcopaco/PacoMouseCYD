@@ -1,0 +1,1724 @@
+/*    PacoMouseCYD throttle -- F. Cañada 2025-2026 --  https://usuaris.tinet.cat/fmco/
+
+      This software and associated files are a DIY project that is not intended for commercial use.
+      This software uses libraries with different licenses, follow all their different terms included.
+
+      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+      Sources are only provided for building and uploading to the device.
+      You are not allowed to modify the source code or fork/publish this project.
+      Commercial use is forbidden.
+
+      --------------------------------------------------------------------------------------------------
+
+      Use 2.8" Cheap Yellow Display ESP32-2432S028 (CYD)
+      - ILI9341 driver chip (320x240)
+      - XPT2046 chip for touch screen
+
+      CYD Also available in 2.4" and 3.2" (Use Resistive touch)
+
+      Select ESP32 Dev Module in Arduino IDE
+
+      SD Card. IMPORTANT!!!: use FAT32 SD card (max. 32GB)
+
+      --------------------------------------------------------------------------------------------------
+
+       v0.1     24feb25   Start writting code
+       v0.2     07mar25   GUI, SD Pictures, Wifi configuration and loco throttle on Z21 working
+       v0.3     21mar25   Added loco list sorting and loco image selection. Added internal file system for loco data.
+       v0.4     19apr25   Added configuration menu screen. Corrected touch rotation for CYD 2.4". Changed translations files. Added programming CV. Added speedometer.
+       v0.5     02jun25   Added steam loco throttle. Adding more function icons. Added Xpressnet LAN and Loconet over TCP protocols. Added experimental identify command station for Loconet.
+       v0.6     08oct25   Added Loconet programming. New LocoEditor for browser on SD.
+       v0.7     23nov25   Corrected bugs on loconet steam direction. Added accessory panels. Added WiFi analyzer.
+       v0.8     15dec25   Added ECoS/CS1 protocol. Updated user defined CYDs. Changes in modal windows.
+       v0.9     03jan26   Added Station Run for kids. Corrected minor bugs on loconet
+*/
+
+// PacoMouseCYD program version
+#define VER_H "0"
+#define VER_L "9"
+#define VER_R "c"
+
+
+//#define DEBUG                                               // Descomentar para mensajes de depuracion
+
+// Libraries
+
+#include <Arduino.h>
+#include "config.h"                                         // PacoMouseCYD config file
+#include "icon.h"                                           // PacoMouseCYD icons
+#include "gui.h"                                            // PacoMouseCYD Graphic User Interface
+#include "translations.h"                                   // PacoMouseCYD languages
+#include <FS.h>                                             // SD Card. IMPORTANT!!!: use FAT32 SD card (max. 32GB)
+#include <SD.h>
+#include <LittleFS.h>
+#include <SPI.h>
+#include <TFT_eSPI.h>                                       // Graphics and font library for ILI9341 driver chip  v2.5.43
+#include "XPT2046.h"                                        // PacoMouseCYD touch screen XPT2046 (2.8": bit bang, 2.4": SPI)
+#include <EEPROM.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#include "lnet.h"                                           // PacoMouseCYD LNTCP
+
+
+#ifdef DEBUG
+char output[80];
+
+#define DEBUG_MSG(...)  snprintf(output,80, __VA_ARGS__ );   \
+  Serial.println(output);
+#else
+#define DEBUG_MSG(...)
+#endif
+
+
+////////////////////////////////////////////////////////////
+// ***** SD CARD *****
+////////////////////////////////////////////////////////////
+
+bool sdDetected;
+File root;
+char folderSel[32];
+int dirCount = 1;
+char DirAndFile[15];
+char FileName[32];
+
+#define FORMAT_LITTLEFS_IF_FAILED true
+
+
+////////////////////////////////////////////////////////////
+// ***** TFT *****
+////////////////////////////////////////////////////////////
+
+TFT_eSPI tft = TFT_eSPI();                                  // Invoke library, pins defined in User_Setup.h
+
+TFT_eSprite sprite = TFT_eSprite(&tft);
+
+// backlight
+#define LEDC_CHANNEL_0     0                                // use first channel of 16 channels (started from zero)
+#define LEDC_RESOLUTION    8                                // use 8 (12) bit precission for LEDC timer
+#define LEDC_BASE_FREQ     5000                             // 5000 Hz as a LEDC base frequency
+
+#define INACT_TIME         1200                             // 2 minutes inactivity (in 100ms) -> lower bright
+uint8_t backlight;
+uint8_t currBacklight;
+
+uint16_t oldNeedle;
+
+#define USB_UP      2                                       // Display USB up
+#define USB_DOWN    0                                       // Display USB down
+
+uint8_t locationUSB;
+
+
+////////////////////////////////////////////////////////////
+// ***** TOUCHSCREEN *****
+////////////////////////////////////////////////////////////
+
+XPT2046_TS touchscreen(XPT2046_MOSI, XPT2046_MISO, XPT2046_CLK, XPT2046_CS);
+
+#define SW_BOOT 0                                           // BOOT button used to enter touchscreen calibration window
+
+bool bootPressed;
+bool calibrationPending;
+bool clickDetected = false;                                 // pulsacion detectada en panel tactil
+
+
+////////////////////////////////////////////////////////////
+// ***** ENCODER *****
+////////////////////////////////////////////////////////////
+
+volatile int outA;                                          // encoder input used by ISR
+volatile int outB;
+volatile int copyOutA;
+volatile int copyOutB;
+volatile uint32_t  lastTimeEncoder;
+volatile byte encoderValue;                                 // encoder shared values (ISR & program)
+volatile byte encoderMax;
+volatile bool encoderChange;
+volatile bool encoderNeedService;
+
+#define ENC_DEBOUNCE  3
+
+byte statusSwitch;
+bool switchOn;
+const unsigned long timeoutButtons = 50;                    // temporizador antirebote
+unsigned long timeButtons;
+
+
+////////////////////////////////////////////////////////////
+// ***** EEPROM *****
+////////////////////////////////////////////////////////////
+
+#define EEPROM_SIZE         512
+
+enum Settings {
+  EE_XMIN_H, EE_XMIN_L, EE_XMAX_H, EE_XMAX_L, EE_YMIN_H, EE_YMIN_L, EE_YMAX_H, EE_YMAX_L, EE_BACKLIGHT, EE_LANGUAGE,
+  EE_ADRH, EE_ADRL, EE_STOP_MODE, EE_SHUNTING, EE_ROCO, EE_LOCK, EE_SHORT, EE_USB_LOCATION, EE_CMD_STA, EE_CMD_AUTO,
+  EE_STA_ADRH1, EE_STA_ADRL1, EE_STA_ADRH2, EE_STA_ADRL2, EE_STA_ADRH3, EE_STA_ADRL3, EE_STA_ADRH4, EE_STA_ADRL4,
+  EE_STA_TRNDEF, EE_STA_TRNNUM, EE_STA_NUM, EE_STA_TIME,
+  EE_WIFI,                                                  //  datos WiFi. (Tiene que ser el ultimo)
+}; // EEPROM settings
+
+bool eepromChanged;
+
+
+////////////////////////////////////////////////////////////
+// ***** WiFi *****
+////////////////////////////////////////////////////////////
+
+struct {
+  char ssid[33];                                            // SSID
+  char password[65];                                        // Password
+  IPAddress CS_IP;                                          // IP
+  uint16_t port;                                            // Port
+  bool serverType;                                          // Server type
+  byte protocol;                                            // protocol
+  int  ok;
+} wifiSetting;
+
+enum typeProto {CLIENT_Z21, CLIENT_XNET, CLIENT_ECOS, CLIENT_LNET};
+
+WiFiClient Client;
+WiFiUDP Udp;
+
+#define z21Port   21105                                     // local port to listen on command station
+#define XnetPort   5550
+#define ECoSPort  15471
+
+uint16_t networks;
+uint8_t scrSSID;
+
+enum cmdStation {CMD_DR, CMD_ULI, CMD_DIG, CMD_UNKNOW};
+byte typeCmdStation;                                        // tipo de central Loconet para funciones
+
+// RSSI RANGE
+#define RSSI_CEILING            -40
+#define RSSI_FLOOR              -100
+#define NEAR_CHANNEL_RSSI_ALLOW -70
+#define CHANNEL_WIDTH           15
+#define GRAPH_HEIGHT            188
+#if (TFT_WIDTH == 240)
+#define GRAPH_OFFSET            0
+#define GRAPH_BASELINE          222
+#else
+#define GRAPH_OFFSET            40
+#define GRAPH_BASELINE          302
+#endif
+
+// Channel color mapping from channel 1 to 14
+uint16_t channel_color[] = {
+  COLOR_RED, COLOR_ORANGE, COLOR_YELLOW, COLOR_GREEN, COLOR_CYAN, COLOR_MAGENTA, COLOR_RED,
+  COLOR_ORANGE, COLOR_YELLOW, COLOR_GREEN, COLOR_CYAN, COLOR_MAGENTA, COLOR_RED, COLOR_ORANGE,
+};
+
+uint8_t scan_count = 0;
+uint8_t ap_count[14];
+int32_t max_rssi[14];
+
+////////////////////////////////////////////////////////////
+// ***** GUI *****
+////////////////////////////////////////////////////////////
+
+uint16_t posObjStack1;
+uint16_t posObjStack2;
+uint16_t paramChild;
+
+uint8_t lastLanguage;
+
+
+////////////////////////////////////////////////////////////
+// ***** PACOMOUSE *****
+////////////////////////////////////////////////////////////
+
+enum initResult {INIT_OK, INIT_NO_SD, INIT_NO_WIFI, INIT_NO_CONNECT};
+enum Err {NO_ERROR, ERR_OFF, ERR_STOP, ERR_SERV, ERR_WAIT, ERR_FULL, ERR_CHG_WIFI, ERR_CV, ERR_ASK_SURE};
+
+byte errType;
+
+initResult initStatus;
+
+byte csStatus = 0;
+
+#define DEFAULT_STEPS 4                                     // 128 steps
+byte stopMode;
+bool shuntingMode;
+byte shortAddress;
+
+byte scrHour, scrMin, scrRate, scrPosTime;
+byte clockHour, clockMin, clockRate;
+unsigned long clockTimer, clockInterval;                    // Internal fast clock calculation
+
+enum prgCV {PRG_IDLE, PRG_CV, PRG_RD_CV29, PRG_RD_CV1, PRG_RD_CV17, PRG_RD_CV18, PRG_WR_CV1, PRG_WR_CV17, PRG_WR_CV18, PRG_WR_CV29};
+
+unsigned int CVaddress, CVdata, CVmax;                      // programacion CV
+bool modeProg;
+bool enterCVdata;
+bool progFinished;
+byte progStepCV, lastCV;
+byte cv29, cv17, cv18;
+unsigned int decoAddress;
+
+enum lock {LOCK_SEL_LOCO, LOCK_TURNOUT, LOCK_PROG};
+byte lockOptions;
+
+
+////////////////////////////////////////////////////////////
+// ***** LOCOMOTIVES *****
+////////////////////////////////////////////////////////////
+
+unsigned long infoTimer;
+unsigned long pingTimer;
+
+byte myLocoData;                                            // current oco data index
+
+typedef union {                                             // Loco address
+  uint8_t   adr[2];
+  uint16_t  address;
+} lokAddr;
+
+typedef union {
+  uint8_t   xFunc[4];                                       // loco functions, F0F4, F5F12, F13F20 y F21F28
+  uint32_t  Bits;                                           // long para acceder a los bits
+} lokFunc;
+
+typedef struct {
+  lokAddr   myAddr;
+  lokFunc   myFunc;
+  uint8_t   myDir;
+  uint8_t   mySpeed;
+  uint8_t   mySteps;
+  uint16_t  myVmax;
+  char      myName[NAME_LNG + 1];
+  uint16_t  myLocoID;                                       // ID / picture
+  uint8_t   myFuncIcon[30];
+} lokData;
+
+lokData   locoData[LOCOS_IN_STACK];                         // Loco data
+
+uint16_t  locoStack[LOCOS_IN_STACK];                        // stack para ultimas locos accedidas
+uint16_t  sortedLocoStack[LOCOS_IN_STACK];                  // lista ordenada de locomotoras
+uint16_t  locoImages[LOCOS_IN_STACK + 20];                  // lista de imagenes en el sistema y SD
+bool useID;
+
+#define MAX_LOCO_IMAGE sizeof(locoImages) / sizeof(locoImages[0])
+uint16_t locoImageIndex;
+
+enum locoSort {SORT_LAST, SORT_NUM_UP, SORT_NUM_DWN, SORT_NAME_UP, SORT_NAME_DWN};
+uint16_t currOrder;
+
+
+
+struct {
+  unsigned int id;                                          // stack loco data
+  unsigned int locoAddress;
+  char locoName[NAME_LNG + 1];
+} rosterList[LOCOS_IN_STACK];
+
+
+////////////////////////////////////////////////////////////
+// ***** ACCESSORIES *****
+////////////////////////////////////////////////////////////
+
+#define AUTO_INTERVAL       100UL                           // Timer interval (100ms)     
+#define TIME_ACC_ON         2                               // accessory activation time accessory (200ms)
+#define TIME_ACC_CDU        2                               // time to wait after accessory deactivated for CDU (200ms)
+
+enum fifo {FIFO_EMPTY, FIFO_ACC_ON, FIFO_ACC_CDU};
+
+uint16_t accessoryFIFO[32];                                 // FIFO 32 elements. Hardcoded in functions.
+uint16_t lastInFIFO;
+uint16_t firstOutFIFO;
+uint16_t cntFIFO;
+uint16_t lastAccessory;
+uint8_t accessoryTimer;
+uint8_t stateFIFO;
+
+// DESVIADO: ROJO  - > links  thrown
+// RECTO:    VERDE + < rechts closed
+enum posDesvio {NO_MOVIDO, DESVIADO, RECTO, INVALIDO};
+
+bool editAccessory;
+uint8_t currPanel;
+uint8_t currPanelAcc;
+uint8_t currAccAspects;
+bool accPanelChanged;
+uint16_t myTurnout;
+
+typedef enum accType {ACC_UNDEF, ACC_TURN_L, ACC_TURN_R, ACC_TRIPLE, ACC_CROSSING, ACC_DCROSS, ACC_BETRELLE, ACC_SIGNAL2, ACC_SIGNAL3, ACC_SIGNAL4, ACC_SEM2, ACC_SEM3,
+                      ACC_PAN, ACC_TT_L, ACC_TT_R, ACC_TT_TRK, ACC_TT_TURN, ACC_LIGHT, ACC_SOUND, ACC_POWER, ACC_KEYPAD, ACC_MAX,
+                     };
+
+typedef struct {
+  uint16_t  fncIcon;
+  uint16_t  color;
+  uint16_t  colorOn;
+} accAspect;
+
+typedef struct {
+  uint8_t   aspects;
+  uint8_t   num;
+  accAspect icon[4];
+} accObj;
+
+const accObj accDef[ACC_MAX] = {
+  { 1, 99, {{FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_UNDEF
+  { 2, 99, {{FNC_TURNLD_OFF, COLOR_BLACK, COLOR_RED},          {FNC_TURNLS_OFF, COLOR_BLACK, COLOR_GREEN},        {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TURN_L
+  { 2, 99, {{FNC_TURNRD_OFF, COLOR_BLACK, COLOR_RED},          {FNC_TURNRS_OFF, COLOR_BLACK, COLOR_GREEN},        {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TURN_R
+  { 3, 99, {{FNC_TURN3L_OFF, COLOR_BLACK, COLOR_RED},          {FNC_TURN3S_OFF, COLOR_BLACK, COLOR_GREEN},        {FNC_TURN3R_OFF, COLOR_BLACK, COLOR_RED},          {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TRIPLE
+  { 2, 99, {{FNC_CROSD_OFF, COLOR_BLACK, COLOR_RED},           {FNC_CROSS_OFF, COLOR_BLACK, COLOR_GREEN},         {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_CROSSING
+  { 4,  4, {{FNC_DCROSSD1_OFF, COLOR_BLACK, COLOR_RED},        {FNC_DCROSSS1_OFF, COLOR_BLACK, COLOR_GREEN},      {FNC_DCROSSD2_OFF, COLOR_BLACK, COLOR_RED},        {FNC_DCROSSS2_OFF, COLOR_BLACK, COLOR_GREEN}}},      // ACC_DCROSS
+  { 2, 99, {{FNC_BRETELLED_OFF, COLOR_BLACK, COLOR_RED},       {FNC_BRETELLE_OFF, COLOR_BLACK, COLOR_GREEN},      {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_BETRELLE
+  { 2, 99, {{FNC_SIGRY_OFF, COLOR_BLACK, COLOR_RED},           {FNC_SIGGW_OFF, COLOR_BLACK, COLOR_GREEN},         {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SIGNAL2
+  { 3,  3, {{FNC_SIGRY_OFF, COLOR_BLACK, COLOR_RED},           {FNC_SIGGW_OFF, COLOR_BLACK, COLOR_GREEN},         {FNC_SIGRY_OFF, COLOR_BLACK, COLOR_YELLOW},        {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SIGNAL3
+  { 4,  4, {{FNC_SIGRY_OFF, COLOR_BLACK, COLOR_RED},           {FNC_SIGGW_OFF, COLOR_BLACK, COLOR_GREEN},         {FNC_SIGRY_OFF, COLOR_BLACK, COLOR_YELLOW},        {FNC_SIGGW_OFF, COLOR_BLACK, COLOR_WHITE}}},         // ACC_SIGNAL4
+  { 2, 99, {{FNC_SEMR_OFF, COLOR_BLACK, COLOR_RED},            {FNC_SEMG_OFF, COLOR_BLACK, COLOR_RED},            {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SEM2
+  { 3,  3, {{FNC_SEMR_OFF, COLOR_BLACK, COLOR_RED},            {FNC_SEMG_OFF, COLOR_BLACK, COLOR_RED},            {FNC_SEMY_OFF, COLOR_BLACK, COLOR_RED},            {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SEM3
+  { 2, 99, {{FNC_PANR_OFF, COLOR_BLACK, COLOR_RED},            {FNC_PANG_OFF, COLOR_BLACK, COLOR_RED},            {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_PAN
+  { 1, 99, {{FNC_TTL_OFF, COLOR_BLACK, COLOR_RED},             {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TT_L
+  { 1, 99, {{FNC_TTR_OFF, COLOR_BLACK, COLOR_GREEN},           {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TT_R
+  { 1, 99, {{FNC_TTTRK_OFF, COLOR_BLACK, COLOR_BLACK},         {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TT_TRK
+  { 1, 99, {{FNC_TTROT_OFF, COLOR_BLACK, COLOR_YELLOW},        {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_TT_TURN
+  { 2, 99, {{FNC_LIGHT_OFF, COLOR_BLACK, COLOR_LIGHTGREY},     {FNC_LIGHT_OFF, COLOR_BLACK, COLOR_YELLOW},        {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_LIGHT
+  { 2, 99, {{FNC_SOUND_OFF, COLOR_BLACK, COLOR_LIGHTGREY},     {FNC_SOUND_OFF, COLOR_BLACK, COLOR_YELLOW},        {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SOUND
+  { 2, 99, {{FNC_POWER_OFF, COLOR_RED, COLOR_RED},             {FNC_POWER_OFF, COLOR_GREEN, COLOR_GREEN},         {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_POWER
+  { 1, 99, {{FNC_KEYPAD_OFF, COLOR_BLACK, COLOR_YELLOW},       {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_KEYPAD
+};
+
+typedef struct {
+  accType   type;
+  uint16_t  addr;
+  uint16_t  addr2;
+  char      accName[ACC_LNG + 1];
+  uint8_t   currAspect;
+  uint16_t  activeOutput;                                             // '3A2G 3A2R 3A1G 3A1R  2A2G 2A2R 2A1G 2A1R  1A2G 1A2R 1A1G 1A1R  0A2G 0A2R 0A1G 0A1R'
+} panelElement;
+
+const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021, 0x4521, 0x0021, 0x0021, 0x0421, 0x8421, 0x0021, 0x0421, 0x0021, 0x0002, 0x0001, 0x0001, 0x0002, 0x0021, 0x0021, 0x0021, 0x0000};
+
+panelElement accPanel[16];
+panelElement currAccEdit;
+uint8_t savedAspect[16][16];
+
+////////////////////////////////////////////////////////////
+// ***** SPEEDOMETER *****
+////////////////////////////////////////////////////////////
+
+uint32_t  speedoStartTime;
+uint32_t  speedoEndTime;
+uint32_t  speedoSpeed;
+uint16_t  speedoScale;
+uint16_t  speedoLength;
+
+enum speedo {SPD_WAIT, SPD_BEGIN, SPD_COUNT, SPD_ARRIVE, SPD_END};
+uint16_t  speedoPhase;
+
+
+////////////////////////////////////////////////////////////
+// ***** STEAM  *****
+////////////////////////////////////////////////////////////
+
+uint16_t oldSteamLoco;                                      // steam loco address
+uint16_t oldPressure;                                       // 0..270   manometer needle angle
+uint16_t oldSpeedSteam;                                     // 240..305 throttle bar angle
+uint16_t oldLevelBoiler;                                    // 0..50    water level bar
+uint16_t oldLevelTender;                                    // 0..500   tender level bar
+
+uint8_t  steamDir;                                          // 0x80: Forward, 0x00: Backward
+uint16_t targetSpeedSteam;                                  // 0..127   calculated target speed
+uint16_t currentSteamSpeed;                                 // 0..127   current speed
+uint16_t steamPressure;                                     // 0..100   boiler pressure
+uint16_t waterLevelBoiler;                                  // 0..100   boiler water
+uint16_t waterLevelTender;                                  // 0..500   tender water
+
+bool fillTender;                                            // Tender water filling
+bool waterInjection;                                        // Boiler water injection
+bool shovelCoal;                                            // Shoveling coal to firebox
+
+
+#define STEAM_LOAD_TIME       250                           // Basic Timeout for water & steam
+#define STEAM_SMOKE_SLOW      3200                          // Chimney smoke at slow speed
+#define STEAM_SMOKE_FAST      600                           // Chimney smoke at fast speed
+#define STEAM_JOHNSON_NEUTRAL 3                             // Johnson bar neutral position
+
+uint32_t currentSteamTime;
+uint32_t steamTimeSpeed;
+uint32_t steamTimeSteam;
+uint32_t steamTimeWater;
+uint32_t steamTimeLoad;
+uint32_t steamTimeSmoke;
+uint32_t changeSteam;
+uint32_t changeWater;
+uint32_t changeSpeed;
+uint32_t changeSmoke;
+
+enum steamLimits {LIMIT_THROTTLE, LIMIT_JOHNSON, LIMIT_PRESSURE, LIMIT_WATER, LIMIT_TENDER, LIMIT_BRAKE, MAX_LIMIT};
+
+#define LIMIT_NONE 127
+
+uint16_t steamSpeedLimit[MAX_LIMIT];
+
+////////////////////////////////////////////////////////////
+// ***** STATION RUN *****
+////////////////////////////////////////////////////////////
+
+uint16_t  staTime;
+uint16_t  staCurrTime;
+uint16_t  staStartTime;
+uint8_t   staLevel;
+uint8_t   staStars;
+uint8_t   staStations;          // stations target
+uint8_t   staCurrStation;       // stations counter
+uint8_t   staLastStation;       // last color station
+uint8_t   staMaxStations;
+uint8_t   staMaxTurnout;
+
+#define MAX_STATIONS  5
+
+const uint16_t staColors[MAX_STATIONS] = {COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_WHITE, COLOR_CYAN};
+
+uint16_t staTurnoutAdr1;
+uint16_t staTurnoutAdr2;
+uint16_t staTurnoutAdr3;
+uint16_t staTurnoutAdr4;
+uint8_t staTurnoutDef;
+bool staTurnoutPos[4];
+
+
+////////////////////////////////////////////////////////////
+// ***** Z21 *****
+////////////////////////////////////////////////////////////
+
+#define csNormalOps                   0x00                  // Normal Operation Resumed
+#define csEmergencyStop               0x01                  // Emergency Stop
+#define csEmergencyOff                0x02                  // Emergency off. Xpressnet
+#define csTrackVoltageOff             0x02                  // Emergency off. Z21
+#define csStartMode                   0x04                  // Start mode.  Xpressnet
+#define csShortCircuit                0x04                  // ShortCircuit
+#define csServiceMode                 0x08                  // Service mode. Xpressnet
+#define csReserved                    0x10
+#define csProgrammingModeActive       0x20                  // Service Mode. Z21
+#define csPowerUp                     0x40                  // Xpressnet
+#define csErrorRAM                    0x80                  // Error RAM. Xpressnet
+
+byte packetBuffer[1500];                                    // buffer to hold incoming packet, max. 1472 bytes
+byte OutData[80];
+byte OutPos = 0;
+byte OutXOR;
+
+// Z21 white message header
+#define LAN_GET_SERIAL_NUMBER         0x10
+#define LAN_GET_CODE                  0x18
+#define LAN_GET_HWINFO                0x1A
+#define LAN_LOGOFF                    0x30
+#define LAN_X_Header                  0x40
+#define LAN_SET_BROADCASTFLAGS        0x50
+#define LAN_GET_BROADCASTFLAGS        0x51
+#define LAN_GET_LOCOMODE              0x60
+#define LAN_SET_LOCOMODE              0x61                  // Not implemented
+#define LAN_GET_TURNOUTMODE           0x70
+#define LAN_SET_TURNOUTMODE           0x71                  // Not implemented
+#define LAN_RMBUS_DATACHANGED         0x80
+#define LAN_RMBUS_GETDATA             0x81
+#define LAN_RMBUS_PROGRAMMODULE       0x82                  // Not implemented
+#define LAN_SYSTEMSTATE_DATACHANGED   0x84
+#define LAN_SYSTEMSTATE_GETDATA       0x85
+#define LAN_RAILCOM_DATACHANGED       0x88
+#define LAN_RAILCOM_GETDATA           0x89
+#define LAN_LOCONET_Z21_RX            0xA0
+#define LAN_LOCONET_Z21_TX            0xA1
+#define LAN_LOCONET_FROM_LAN          0xA2
+#define LAN_LOCONET_DISPATCH_ADDR     0xA3                  // unused
+#define LAN_LOCONET_DETECTOR          0xA4
+#define LAN_FAST_CLOCK_CONTROL        0xCC
+#define LAN_FAST_CLOCK_DATA           0xCD
+#define LAN_FAST_CLOCK_SETTINGS_GET   0xCE                  // unused
+#define LAN_FAST_CLOCK_SETTINGS_SET   0xCF                  // unused
+
+enum xAnswer {DATA_LENL, DATA_LENH, DATA_HEADERL, DATA_HEADERH, XHEADER, DB0, DB1, DB2, DB3, DB4, DB5, DB6, DB7, DB8};
+
+#define Z21_PING_INTERVAL 5                                 // Prevent automatic LOGOFF (5s)
+
+bool waitResultCV;
+
+
+////////////////////////////////////////////////////////////
+// ***** XPRESSNET LAN *****
+////////////////////////////////////////////////////////////
+
+enum xPacket {FRAME1, FRAME2, HEADER, DATA1, DATA2, DATA3, DATA4, DATA5};
+
+#define XNET_PING_INTERVAL 10000UL                          // Prevent closing the connection
+
+volatile byte rxBufferXN[20];                               // Comunicacion Xpressnet
+volatile byte txBuffer[14];
+volatile byte txBytes;
+volatile byte rxBytes;
+
+byte rxXOR, rxIndice, txXOR, rxData;
+byte xnetVersion, xnetCS;
+bool getInfoLoco, getResultsSM;
+bool askMultimaus;                                          // Multimaus
+byte highVerMM, lowVerMM;
+
+unsigned long timeoutXnet;
+
+////////////////////////////////////////////////////////////
+// ***** LOCONET OVER TCP *****
+////////////////////////////////////////////////////////////
+
+lnMsg SendPacket;                                           // Paquete a enviar por Loconet WiFi
+lnMsg RecvPacket;                                           // Paquete recibido por Loconet WiFi
+
+char rcvStr[10];
+byte rcvStrPos;
+enum rcvPhase {WAIT_TOKEN, RECV_TOKEN, RECV_PARAM, SENT_TOKEN, SENT_PARAM};
+byte rcvStrPhase;
+bool sentOK;
+unsigned long timeoutSend;
+
+enum statusSlot {STAT_FREE, STAT_COMMON, STAT_IDLE, STAT_IN_USE};
+
+struct slot {
+  byte num;                                                 // slot number: 1..120 (0x01..0x78)
+  byte state;                                               // state: in_use/idle/common/free
+  byte trk;                                                 // track status
+} mySlot;
+
+const byte stepsLN[] = {28, 28, 14, 128, 28, 28, 14, 128};
+
+#define LNET_PING_INTERVAL 55000UL                          // Prevent PURGE of slot (55s)
+
+bool doDispatchGet, doDispatchPut;                          // dispatching
+uint8_t lastTrk;                                            // last received global track status
+
+uint8_t autoIdentifyCS;
+bool lnetProg;                                              // programando CV o LNCV
+byte ulhiProg;                                              // Programming track off (UHLI)
+
+enum lncv {LNCV_ART, LNCV_MOD, LNCV_ADR, LNCV_VAL};
+unsigned int artNum;
+unsigned int modNum;
+unsigned int numLNCV;
+unsigned int valLNCV;
+
+byte optLNCV;
+
+
+////////////////////////////////////////////////////////////
+// ***** ECoS *****
+////////////////////////////////////////////////////////////
+
+#define ID_ECOS             1                               // Base objects ID
+#define ID_PRGMANAGER       5
+#define ID_POMMANAGER       7
+#define ID_LOKMANAGER       10
+#define ID_SWMANAGER        11
+#define ID_SNIFFERMANAGER   25
+#define ID_S88MANAGER       26
+#define ID_BOOSTERMANAGER   27
+#define ID_S88FEEDBACK      100
+#define ID_INTBOOSTER       65000
+
+char cmd[64];                                               // send buffer
+
+#define NAME_LNG 16                                         // loco names length
+
+#define BUF_LNG 1024
+char inputBuffer[BUF_LNG];
+unsigned int inputLength;
+
+#define TEXTLEN         32             // Length of symbols in input
+
+char  putBackChr;
+int   posFile;
+
+// Tokens
+enum {
+  T_NULL, T_START, T_ENDB, T_REPLY, T_EVENT, T_END, T_COMMA, T_INTLIT, T_SEMI, T_LPARENT, T_RPARENT,
+  T_LBRACKET, T_RBRACKET, T_STRLIT, T_IDENT, T_PRINT, T_INT,
+  T_GET, T_SET, T_QOBJ, T_ADDR, T_NAME, T_PROT, T_STATUS, T_STATUS2, T_STATE,
+  T_REQ, T_VIEW, T_CONTROL, T_RELEASE, T_FORCE,
+  T_GO, T_STOP, T_SHUTDWN, T_OK, T_MSG, T_SPEED, T_STEPS, T_DIR, T_FUNC, T_FSYMBOL, T_FSYMB, T_FICON,
+  T_LOST, T_OTHER, T_CV, T_CVOK, T_ERROR, T_SWITCH,
+  T_CS1, T_ECOS, T_ECOS2, T_APPV,
+};
+
+// Token structure
+struct token {
+  char token;
+  int intvalue;
+};
+
+struct token T;
+int   tokenType;
+char  Text[TEXTLEN + 1];
+
+int errCode;
+int idManager;
+int idCommand;
+int numLoks;
+int lastNumValue;
+bool requestedCV;
+int appVer;
+
+byte msgDecodePhase;
+enum {MSG_WAIT, MSG_START, MSG_REPLY, MSG_EVENT, MSG_END, MSG_REPLYBODY, MSG_EVENTBODY};
+
+uint8_t mySpeedStep;
+
+const uint8_t FunktionsTastenSymbole[] = {                  // Conversion table from ECoS v4.2.9 to PacoMouseCYD function icons
+  1,  1,   2,  3,  4,  5,  6,  7,
+  8,  9,  10, 11, 12, 13, 14, 15,
+  16, 17, 18, 19, 20, 21, 22, 23,
+  2,  2,  24,  2,  2, 25, 26, 27,   //31
+
+  28, 29, 30, 2, 31,  2, 32,  2,
+  2,  2,  2,  2, 33, 34,  2,  2,   //47
+  2,  2,  2,  2,  2,  2,  2, 35,
+  2, 36,  2,  2,  2,  2,  2,  2,   //63
+
+  2,  2,  2,  2,  2,  2,  2,  2,
+  2,  2,  2,  2,  2,  2,  2,  2,   //79
+  2,  2,  2,  2, 37,  2,  2, 38,
+  39, 2,  2,  2,  2,  2,  2,  2,   //95
+
+  2,  2,  2,  2,  2, 39,  2,  2,   //103
+  2,  2,  2,  2,  2,  2,  2,  2,
+  2,  2,  2,  2,  2,  2,  2,  2,
+  2,  2,  2,  2, 40,  2,  2,  2,   //127
+};
+
+
+const uint8_t FunktionsTastenSymboleCS1[] = {               // Conversion table from CS1 v2.0.4 to PacoMouseCYD function icons
+  2, 10,  3, 14,  5, 31, 15, 16,
+  11, 13, 17,  9, 12,  6,  7, 23,
+  4,  2, 25, 26, 22,  2, 30, 27,
+  2,  2,  2, 28, 29, 20, 21,  8,   //31
+
+  18,  2,  2,  2,  2,  2,  2,  2,
+  2,  2,  2,  2,  2,  2,  2,  2,  //47
+  2,  2,  2,  2,  2,  2,  2,  2,
+  2,  2,  2,  2,  2,  2,  2,  2,  //63
+};
+
+
+////////////////////////////////////////////////////////////
+// ***** MAIN PROGRAM *****
+////////////////////////////////////////////////////////////
+
+void setup() {
+  uint16_t posLabel;
+  initPins();
+  delay(500);                                               // power-up safety delay
+#ifdef DEBUG
+  Serial.begin(115200);                                     // Debug messages, serial at 115200b
+  DEBUG_MSG("\n\nPacoMouseCYD v%s.%s", VER_H, VER_L);
+  DEBUG_MSG(USER_SETUP_INFO);
+  DEBUG_MSG("Chip Model: %s \nFlash Chip Size: %lu", ESP.getChipModel(), ESP.getFlashChipSize())
+  DEBUG_MSG("ESP_ARDUINO_VERSION: %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH)
+#endif
+  initGUI();
+  initVariables();
+  sdDetected = SD.begin(SD_CS) ? true : false;
+  DEBUG_MSG("SD Card %s", sdDetected ? "found" : "begin failed")
+  tft.init();
+  tft.fillScreen(COLOR_BLACK);
+#ifdef DEBUG
+  DEBUG_MSG("Display driver: %X %dx%d", TFT_DRIVER, TFT_WIDTH, TFT_HEIGHT)
+  DEBUG_MSG("TFT BL pin: %d", TFT_BL)
+  DEBUG_MSG("GUI Usage:\n Timers: %d\n Windows: %d\n Labels: %d", MAX_SYS_TIMER, MAX_WIN_OBJ, MAX_LABEL_OBJ)
+  DEBUG_MSG(" Draw Strings: %d\n Chars: %d\n Function Icons: %d", MAX_DRAWSTR_OBJ, MAX_CHAR_OBJ, MAX_FNC_OBJ)
+  DEBUG_MSG(" Icons: %d\n Buttons: %d\n Radio Buttons: %d", MAX_ICON_OBJ, MAX_BUT_OBJ, MAX_RAD_OBJ)
+  DEBUG_MSG(" Progress Bar: %d\n Loco Pictures: %d\n Gauges: %d", MAX_BAR_OBJ, MAX_LPIC_OBJ, MAX_GAUGE_OBJ)
+  DEBUG_MSG(" Text Box: %d\n Switch: %d\n Keyboard: %d", MAX_TXT_OBJ, MAX_SWITCH_OBJ, MAX_KEYB_OBJ)
+#endif
+
+  // Setting up the LEDC and configuring the Back light pin
+  // NOTE: this needs to be done after tft.init()
+#if (ESP_ARDUINO_VERSION_MAJOR > 2)
+  DEBUG_MSG("PWM LED code for version 3.x")
+  ledcAttach(TFT_BL, LEDC_BASE_FREQ, LEDC_RESOLUTION);
+#else
+  DEBUG_MSG("PWM LED code for version 2.x")
+  ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_RESOLUTION); // backlight PWM
+  ledcAttachPin(TFT_BL, LEDC_CHANNEL_0);
+#endif
+  setBacklight (backlight);
+
+  // setup the touchscreen
+  // NOTE: this needs to be done after tft.init()
+  touchscreen.begin(TFT_WIDTH, TFT_HEIGHT);
+  setRotationDisplay(locationUSB);
+  copyOutA = digitalRead (ENCODER_A);                       // init encoder ISR
+  copyOutB = 0x80;
+  attachInterrupt (digitalPinToInterrupt (ENCODER_A), encoderISR, CHANGE);
+
+  openWindow(WIN_LOGO);                                     // special window, don't use events just draw
+  initStatus = initSequence();
+  getLastLoco();
+}
+
+
+void loop() {
+  timerProcess();
+  hidProcess();
+  wifiProcess();
+  if (isWindow(WIN_STEAM))
+    steamProcess();
+  if (eventsPending > 0) {                                  // execute pending events
+    eventProcess();
+    DEBUG_MSG("New Event...")
+  }
+  if (! bootPressed) {                                      // check BOOT button to enter Touchscreen Calibration
+    if (digitalRead(SW_BOOT) == LOW) {
+      bootPressed = true;
+      newEvent(OBJ_WIN, WIN_CALIBRATE, EVNT_BOOT);
+      DEBUG_MSG("BOOT switch pressed...")
+    }
+  }
+  if (clickDetected) {                                      // only individual clicks
+    if (! touchscreen.touched())
+      clickDetected = false;
+  }
+  else {
+    if (touchscreen.touched()) {
+      TSPoint p = touchscreen.getTouch();
+      if (p.z > 350) {
+        DEBUG_MSG("X: %d, Y: %d, Z: %d", p.x, p.y, p.z);
+        sendClickEvent(p.x, p.y);
+        clickDetected = true;
+      }
+    }
+  }
+}
+
+
+////////////////////////////////////////////////////////////
+// ***** SUPPORT *****
+////////////////////////////////////////////////////////////
+
+void initVariables() {
+  byte pos;
+  uint16_t xm, xM, ym, yM, value;
+  EEPROM.begin(EEPROM_SIZE);
+  eepromChanged = false;
+  currLanguage = EEPROM.read(EE_LANGUAGE);
+  if (currLanguage >= MAX_LANG)
+    currLanguage = LANG_ENGLISH;
+  bootPressed = false;
+  calibrationPending = false;
+  EEPROM.get (EE_WIFI, wifiSetting);                        // read WiFi settings
+  if (wifiSetting.ok != 0x464D) {                           // check correct EEPROM signature
+    snprintf (wifiSetting.ssid, 32, "");                    // init WiFi settings
+    snprintf (wifiSetting.password, 64, "12345678");
+    wifiSetting.CS_IP = IPAddress(192, 168, 0, 111);
+    wifiSetting.port = 1234;
+    wifiSetting.serverType = true;
+    wifiSetting.protocol = CLIENT_Z21;
+    wifiSetting.ok = 0x464D;
+    EEPROM.put(EE_WIFI, wifiSetting);                       // also init calibration values
+    touchscreen.setCalibration(0, 4095, 0, 4095);           // set default calibration values
+    saveCalibrationValues();                                // save all
+    DEBUG_MSG("Setting default WiFi & calibration values");
+  }
+  xm = (EEPROM.read(EE_XMIN_H) << 8) + EEPROM.read(EE_XMIN_L);
+  xM = (EEPROM.read(EE_XMAX_H) << 8) + EEPROM.read(EE_XMAX_L);
+  ym = (EEPROM.read(EE_YMIN_H) << 8) + EEPROM.read(EE_YMIN_L);
+  yM = (EEPROM.read(EE_YMAX_H) << 8) + EEPROM.read(EE_YMAX_L);
+  touchscreen.setCalibration(xm, xM, ym, yM);               // set calibration values
+  DEBUG_MSG("xMin: %d, xMax: %d, yMin: %d, yMax: %d", xm, xM, ym, yM);
+  backlight = EEPROM.read(EE_BACKLIGHT);
+  if (backlight < USER_MIN_BL)
+    backlight = USER_MIN_BL;
+  locationUSB = EEPROM.read(EE_USB_LOCATION);
+  if (locationUSB > 0)
+    locationUSB = USB_UP;
+  timeButtons = millis();
+  lastTimeEncoder = millis();
+  encoderValue = 0;
+  encoderMax   = 2;
+  encoderNeedService = false;
+  oldNeedle = 0;
+  initFIFO();                                               // accessories
+  editAccessory = false;
+  accPanelChanged = false;
+  currPanel = 0;
+  myTurnout = 1;
+  initLastAspects();
+  CVdata    = 3;                                            // CV programming
+  CVaddress = 1;
+  modeProg = false;
+  enterCVdata = false;
+  progFinished = false;
+  progStepCV = PRG_IDLE;
+  clockRate = 0;                                            // fast clock internal
+  clockHour = 0;
+  clockMin = 0;
+  updateFastClock();
+  initLocos();
+  stopMode = EEPROM.read(EE_STOP_MODE);
+  shuntingMode = (EEPROM.read(EE_SHUNTING) > 0) ? true : false;
+  lockOptions = EEPROM.read(EE_LOCK) & 0x07;
+  shortAddress = EEPROM.read(EE_SHORT);
+  if ((shortAddress != 99) && (shortAddress != 127))
+    shortAddress = 99;
+  typeCmdStation = EEPROM.read(EE_CMD_STA);
+  if (typeCmdStation > CMD_DIG)
+    typeCmdStation = CMD_DR;
+  autoIdentifyCS = EEPROM.read(EE_CMD_AUTO);
+  speedoPhase  = SPD_WAIT;
+  speedoScale  = 87;
+  speedoLength = 1000;
+  speedoSpeed  = 0;
+  oldSteamLoco = 0;
+  mySlot.num = 0;                                           // Loconet slots
+  mySlot.trk = 0x01;                                        // Power on
+  doDispatchGet = false;
+  doDispatchPut = false;
+  lnetProg = false;
+  ulhiProg = UHLI_PRG_END;
+  lastTrk = 0x80;
+  msgDecodePhase = MSG_WAIT;                                // ECoS
+  requestedCV = false;
+  appVer = 4;
+  staTurnoutAdr1 = staGetTurnoutAdr(EE_STA_ADRH1, 1);       // Station Run
+  staTurnoutAdr2 = staGetTurnoutAdr(EE_STA_ADRH2, 2);
+  staTurnoutAdr3 = staGetTurnoutAdr(EE_STA_ADRH3, 3);
+  staTurnoutAdr4 = staGetTurnoutAdr(EE_STA_ADRH4, 4);
+  staTurnoutDef =  EEPROM.read(EE_STA_TRNDEF);
+  staMaxTurnout =  EEPROM.read(EE_STA_TRNNUM);
+  staMaxTurnout =  constrain(staMaxTurnout, 1, 4);
+  staMaxStations = EEPROM.read(EE_STA_NUM);
+  staMaxStations = constrain(staMaxStations, 3, 5);
+  staStartTime =   EEPROM.read(EE_STA_TIME);
+
+
+}
+
+
+
+
+void hidProcess() {
+  if (encoderNeedService)                                   // detectado cambio en pines del encoder
+    encoderService();
+  if (encoderChange)                                        // se ha movido el encoder
+    controlEncoder();
+  if (switchOn)                                             // se ha pulsado el boton del encoder
+    controlSwitch();
+  if (millis() - timeButtons > timeoutButtons)              // lectura de boton
+    readButtons();
+}
+
+
+void updateFastClock() {
+  if (clockRate > 0)
+    sprintf(clockBuf, "%02d:%02d", clockHour, clockMin);
+  else
+    sprintf(clockBuf, "");
+  if (isWindow(WIN_THROTTLE))
+    newEvent(OBJ_TXT, TXT_CLOCK, EVNT_DRAW);
+}
+
+void setSpeedoPhase(uint8_t phase) {
+  drawStrData[DSTR_SPEEDO_BLANK].x = 40 + (speedoPhase * 32);
+  speedoPhase = phase;
+  iconData[ICON_SPEEDO_LOK].x = 40 + (speedoPhase * 32);
+  drawObject(OBJ_DRAWSTR, DSTR_SPEEDO_BLANK);
+  drawObject(OBJ_ICON, ICON_SPEEDO_LOK);
+}
+
+////////////////////////////////////////////////////////////
+// ***** SOPORTE LOCOMOTORAS *****
+////////////////////////////////////////////////////////////
+
+uint16_t checkLocoAddress(uint16_t loco) {
+  if (useID) {
+  }
+  else {
+    loco &= 0x3FFF;
+    if ((loco > 9999) || (loco == 0))                       // Comprueba que este entre 1 y 9999
+      loco = 3;
+  }
+  //DEBUG_MSG("Loco: %d", loco);
+  return loco;
+}
+
+
+void pushLoco(unsigned int loco) {                          // mete locomotora en el stack
+  byte pos;
+  unsigned int adr;
+  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {              // busca loco en stack
+    if (locoStack[pos] == loco)
+      locoStack[pos] = 0;                                   // evita que se repita
+  }
+  pos = 0;
+  do {
+    adr = locoStack[pos];                                   // push the loco in stack
+    locoStack[pos] = loco;
+    loco = adr;
+    pos++;
+  } while ((adr > 0) && (pos < LOCOS_IN_STACK));
+#ifdef DEBUG
+  Serial.print(F("STACK: "));
+  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
+    Serial.print(locoStack[pos]);
+    Serial.print(' ');
+  }
+  Serial.println();
+#endif
+}
+
+void popLoco(unsigned int loco) {                           // elimina locomotora del stack
+  byte pos, n;
+  unsigned int adr;
+  pos = LOCOS_IN_STACK;
+  for (n = 0; n < LOCOS_IN_STACK; n++) {                    // busca loco en stack
+    if (locoStack[n] == loco)
+      pos = n;                                              // save position
+  }
+  if (pos != LOCOS_IN_STACK) {
+    for (n = pos; n < (LOCOS_IN_STACK - 1); n++) {
+      locoStack[n] = locoStack[n + 1];
+    }
+    locoStack[LOCOS_IN_STACK - 1] = 0;
+  }
+}
+
+void initLocos() {
+  uint16_t pos;
+  myLocoData = 0;
+  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
+    locoStack[pos] = 0;                                     // clear loco stack
+    clearLocoData(pos);
+  }
+}
+
+
+void clearLocoData (uint16_t pos) {
+  uint16_t cnt;
+  locoData[pos].myAddr.address = 0;                         // clear loco data
+  locoData[pos].myName[0] = '\0';
+  locoData[pos].myFunc.Bits = 0;
+  locoData[pos].myDir = 0x80;
+  locoData[pos].mySpeed = 0;
+  locoData[pos].mySteps = DEFAULT_STEPS;
+  locoData[pos].myVmax = 100;
+  locoData[pos].myLocoID = SYS_NO_LOK;
+  locoData[pos].myFuncIcon[0] = FNC_LIGHT_OFF;
+  for (cnt = 1; cnt < 29; cnt++)
+    locoData[pos].myFuncIcon[cnt] = FNC_FUNC_OFF;
+  locoData[pos].myFuncIcon[cnt] = FNC_BLANK_OFF;
+}
+
+
+void getLastLoco() {
+  uint16_t loco;
+  loco = locoStack[0];                                      // get most recent loco in stack (filesystem)
+  loco = checkLocoAddress(loco);                            // avoid empty stack
+  findLocoData(loco);                                       // get pos in stack also check stack full
+  loadThrottleData();                                       // load data to throttle
+  updateSpeedHID();                                         // set encoder
+  setTimer(TMR_INFO, 10, TMR_ONESHOT);
+}
+
+void getNewLoco(uint16_t loco) {
+  if (useID) {
+    if (loco != locoData[myLocoData].myLocoID) {
+      releaseLoco();
+    }
+  }
+  else {
+    if (loco != locoData[myLocoData].myAddr.address) {
+      releaseLoco();
+    }
+  }
+  loco = checkLocoAddress(loco);
+  findLocoData(loco);                                       // get pos in stack also check stack full
+  loadThrottleData();                                       // load data to throttle
+  updateSpeedHID();                                         // set encoder
+  infoLocomotora(loco);                                     // ask current values
+  setTimer(TMR_INFO, 5, TMR_ONESHOT);
+}
+
+void findLocoData(uint16_t loco) {
+  uint16_t pos, cnt;
+  pos = 0;
+  if (useID) {
+    while (pos < LOCOS_IN_STACK) {                          // find ID loco data
+      if (locoData[pos].myLocoID == loco) {
+        myLocoData = pos;
+        pushLoco(loco);
+        DEBUG_MSG("Find ID%d data in %d", loco, pos);
+        return;
+      }
+      pos++;
+    }
+  }
+  else {
+    while (pos < LOCOS_IN_STACK) {                          // find address loco data
+      if (locoData[pos].myAddr.address == loco) {
+        myLocoData = pos;
+        pushLoco(loco);
+        DEBUG_MSG("Find %d data in %d", loco, pos);
+        return;
+      }
+      pos++;
+    }
+    DEBUG_MSG("New Loco")
+    pos = 0;                                                // new loco
+    while (pos < LOCOS_IN_STACK) {
+      if (locoData[pos].myAddr.address == 0) {
+        myLocoData = pos;
+        locoData[pos].myAddr.address = loco;
+        locoData[pos].myLocoID = SYS_ELOK;
+        //locoData[pos].mySteps = DEFAULT_STEPS;
+        pushLoco(loco);
+        return;
+      }
+      pos++;
+    }
+  }
+  myLocoData = 0;                                           // stack full
+  alertWindow(ERR_FULL);
+}
+
+
+void loadThrottleData() {
+  uint16_t n;
+  snprintf (locoName, NAME_LNG + 1, "%s", locoData[myLocoData].myName );
+  txtData[TXT_LOCO_NAME].font = (strlen(locoName) > 13) ? FSS7 : FSS9;
+  sprintf (locoAddr, "%d", locoData[myLocoData].myAddr.address);
+  lpicData[LPIC_MAIN].id = locoData[myLocoData].myLocoID;
+  iconData[ICON_FWD].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_NAVY : COLOR_DARKGREY;
+  iconData[ICON_REV].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_DARKGREY : COLOR_NAVY;
+  for (n = 0; n < 10; n++) {
+    fncData[FNC_FX0 + n].num = n;
+    fncData[FNC_FX0 + n].idIcon = locoData[myLocoData].myFuncIcon[n];
+  }
+  updateFuncState(false);
+}
+
+
+void updateFuncState(bool show) {
+  byte n;
+  bool state;
+  for (n = 0; n < 10; n++) {
+    state = bitRead(locoData[myLocoData].myFunc.Bits, fncData[FNC_FX0 + n].num);
+    if (fncData[FNC_FX0 + n].state != state) {
+      fncData[FNC_FX0 + n].state = state;
+      if (show)
+        newEvent(OBJ_FNC, FNC_FX0 + n, EVNT_DRAW);
+      DEBUG_MSG("Change in F%d", fncData[FNC_FX0 + n].num);
+    }
+  }
+}
+
+
+void toggleFunction(uint8_t fnc, uint8_t id) {
+  locoData[myLocoData].myFunc.Bits ^= bit(fnc);
+  fncData[id].state = bitRead(locoData[myLocoData].myFunc.Bits, fnc);
+  funcOperations(fnc);
+  newEvent(OBJ_FNC, id, EVNT_DRAW);
+}
+
+void showFuncBlock(uint8_t fncOffset) {
+  uint16_t ini, cnt;
+  for (ini = 0; ini < 10; ini++) {
+    cnt = ini + FNC_FX0;
+    fncData[cnt].idIcon = locoData[myLocoData].myFuncIcon[ini + fncOffset];
+    fncData[cnt].num = ini + fncOffset;
+    fncData[cnt].state = bitRead(locoData[myLocoData].myFunc.Bits, fncData[cnt].num);
+    drawObject(OBJ_FNC, cnt);
+  }
+}
+
+void showNextFuncBlock()  {
+  uint16_t ini, fncOffset;
+  ini = fncData[FNC_FX0].num;
+  fncOffset = (ini == 20) ? 0 : ini + 10;
+  showFuncBlock(fncOffset);
+}
+
+
+void updateSpeedHID() {
+  byte spd, steps;
+  switch (wifiSetting.protocol) {
+    case CLIENT_Z21:
+    case CLIENT_XNET:
+      if (bitRead(locoData[myLocoData].mySteps, 2)) {       // 0..127 -> 0..63
+        encoderMax = 63;
+        encoderValue = (locoData[myLocoData].mySpeed > 1) ? (locoData[myLocoData].mySpeed >> 1) : 0;
+      }
+      else {
+        if (bitRead(locoData[myLocoData].mySteps, 1)) {     // 0..31
+          encoderMax = 31;
+          spd = (locoData[myLocoData].mySpeed & 0x0F) << 1;
+          if (bitRead(locoData[myLocoData].mySpeed, 4))
+            bitSet(spd, 0);;
+          encoderValue = (spd > 3) ? spd : 0;
+        }
+        else {                                              // 0..15
+          encoderMax = 15;
+          spd = locoData[myLocoData].mySpeed & 0x0F;
+          encoderValue = (spd > 1) ? spd : 0;
+        }
+      }
+      break;
+    case CLIENT_LNET:
+      steps =   getMaxStepLnet();
+      encoderMax = (steps == 128) ? 63 : ((steps == 28) ? 31 : 15);
+      if (locoData[myLocoData].mySpeed > 1) {
+        if (steps == 128) {                                 // Max 100% speed (64 pasos, compatible con 14, 28 y 128 pasos)
+          encoderValue = locoData[myLocoData].mySpeed >> 1; // 0..127 -> 0..63
+        }
+        else {
+          if (steps == 28) {                                // 0..31
+            spd = (((locoData[myLocoData].mySpeed - 2) << 1) / 9);
+            encoderValue = spd + 4;
+          }
+          else {
+            spd = (locoData[myLocoData].mySpeed - 2) / 9;
+            encoderValue = spd + 2;
+          }
+        }
+      }
+      else
+        encoderValue = 0;
+      //DEBUG_MSG("HID Enc:%d Spd:%d", encoderValue, mySpeed);
+      break;
+    case CLIENT_ECOS:
+      encoderMax = 63;                                      // 0..127 -> 0..63
+      encoderValue = (locoData[myLocoData].mySpeed > 1) ? (locoData[myLocoData].mySpeed >> 1) : 0;
+      break;
+  }
+  updateSpeedDir();
+}
+
+
+void updateMySpeed() {
+  byte spd, steps;
+  switch (wifiSetting.protocol) {
+    case CLIENT_Z21:
+    case CLIENT_XNET:
+      if (bitRead(locoData[myLocoData].mySteps, 2)) {       // 0..63 -> 0..127
+        if ((encoderValue == 0) && shuntingMode)            // comprueba Modo maniobras
+          encoderValue = 1;
+        locoData[myLocoData].mySpeed = encoderValue << 1;
+      }
+      else {
+        if (bitRead(locoData[myLocoData].mySteps, 1)) {     // 0..31 -> 0..31     '---43210' -> '---04321'
+          encoderValue = shuntingSpeed (encoderValue, 4);
+          if (encoderValue > 3) {
+            locoData[myLocoData].mySpeed =  (encoderValue >> 1) & 0x0F;
+            bitWrite(locoData[myLocoData].mySpeed, 4, bitRead(encoderValue, 0));
+          }
+          else {
+            switch (encoderValue) {
+              case 0:
+              case 3:
+                locoData[myLocoData].mySpeed = 0;
+                encoderValue = 0;
+                break;
+              case 1:
+              case 2:
+                locoData[myLocoData].mySpeed = 2;
+                encoderValue = 4;
+                break;
+            }
+          }
+        }
+        else {
+          encoderValue = shuntingSpeed (encoderValue, 2);
+          locoData[myLocoData].mySpeed = (encoderValue > 1) ? encoderValue : 0;       // 0..15 -> 0..15
+        }
+      }
+      break;
+    case CLIENT_LNET:
+      steps =   getMaxStepLnet();
+      if (steps == 128) {
+        if ((encoderValue == 0) && shuntingMode)            // Modo maniobras
+          encoderValue = 1;
+        locoData[myLocoData].mySpeed = (encoderValue << 1); // 0..63 -> 0..127
+        if (encoderValue > 61)
+          locoData[myLocoData].mySpeed++;
+      }
+      else {
+        if (steps == 28) {
+          encoderValue = shuntingSpeed (encoderValue, 4);
+          if (encoderValue > 3) {
+            spd = ((encoderValue - 3) * 9) + 1;             // 0..31 -> 0..127
+            locoData[myLocoData].mySpeed =  (spd >> 1) + 1;
+          }
+          else {
+            switch (encoderValue) {
+              case 0:
+              case 3:
+                locoData[myLocoData].mySpeed = 0;
+                encoderValue = 0;
+                break;
+              case 1:
+              case 2:
+                locoData[myLocoData].mySpeed = 5;
+                encoderValue = 4;
+                break;
+            }
+          }
+        }
+        else {
+          encoderValue = shuntingSpeed (encoderValue, 2);
+          if (encoderValue == 1)
+            return;
+          locoData[myLocoData].mySpeed = (encoderValue > 1) ? ((encoderValue - 2) * 9) + 2 : 0;    // 0..15 -> 0..127
+        }
+      }
+      //DEBUG_MSG("LN  Enc:%d Spd:%d", encoderValue, mySpeed);
+      break;
+    case CLIENT_ECOS:
+      if ((encoderValue == 0) && shuntingMode)              // Modo maniobras
+        encoderValue = 1;
+      locoData[myLocoData].mySpeed = (encoderValue << 1);   // 0..63 -> 0..127
+      if (encoderValue > 61)
+        locoData[myLocoData].mySpeed++;
+      break;
+  }
+  locoOperationSpeed();
+}
+
+
+byte shuntingSpeed (byte encoder, byte stepMin) {           // comprueba Modo maniobras
+  if (encoder < stepMin) {
+    if (shuntingMode)
+      return stepMin;
+  }
+  return encoder;
+}
+
+
+void updateSpeedDir() {
+  uint16_t angle, spd, stp;
+  iconData[ICON_FWD].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_NAVY : COLOR_DARKGREY;
+  iconData[ICON_REV].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_DARKGREY : COLOR_NAVY;
+  if (isWindow(WIN_THROTTLE)) {
+    angle = map(encoderValue, 0, encoderMax, 0, 255);
+    // if ((encoderMax == 15) && (encoderValue < 2))
+    //   angle = 0;
+    drawObject(OBJ_ICON, ICON_FWD);
+    drawObject(OBJ_ICON, ICON_REV);
+    spd = map(angle, 0, 255, 0, locoData[myLocoData].myVmax);
+    stp = getCurrentStep();
+    drawSpeed(angle, spd, stp);
+    DEBUG_MSG("Enc: %d-%d Spd: %d Stp: %d", encoderValue, encoderMax, spd, stp)
+  }
+  if (isWindow(WIN_SPEEDO)) {
+    gaugeData[GAUGE_SPEEDO].value = map(encoderValue, 0, encoderMax, 0, 255);
+    fncData[FNC_SPEEDO_DIR].idIcon = (locoData[myLocoData].myDir & 0x80) ? FNC_NEXT_OFF : FNC_PREV_OFF;
+    drawObject(OBJ_GAUGE, GAUGE_SPEEDO);
+    drawObject(OBJ_FNC, FNC_SPEEDO_DIR);
+    drawSpeedoStep();
+  }
+  if (isWindow(WIN_STA_PLAY)) {
+    gaugeData[GAUGE_STATION].value = map(encoderValue, 0, encoderMax, 0, 255);
+    fncData[FNC_STA_DIR].idIcon = (locoData[myLocoData].myDir & 0x80) ? FNC_NEXT_OFF : FNC_PREV_OFF;
+    drawObject(OBJ_GAUGE, GAUGE_STATION);
+    drawObject(OBJ_FNC, FNC_STA_DIR);
+  }
+}
+
+
+void drawSpeed(uint16_t angle, uint16_t spd, uint16_t stp) {
+  angle = (angle < 30) ? 330 + angle : angle - 30;          // convert 0..255 to drawing angles -30..225
+  tft.setPivot(gaugeData[GAUGE_SPEED].x, gaugeData[GAUGE_SPEED].y);
+  sprite.setColorDepth(8);                                  // Create an 8bpp Sprite
+  sprite.createSprite(36, 16);                              // 8bpp requires 36 * 16 = 576 bytes
+  sprite.setPivot(56, 7);                                   // Set pivot relative to top left corner of Sprite
+  sprite.fillSprite(COLOR_BACKGROUND);                      // Fill the Sprite with background
+  sprite.pushRotated(oldNeedle);                            // Delete needle
+  sprite.drawBitmap(0, 0, needle, 36, 15, COLOR_RED);       // Draw new needle
+  sprite.drawFastHLine(4, 7, 29, COLOR_PINK);
+  sprite.pushRotated(angle, COLOR_BACKGROUND);
+  oldNeedle = angle;
+  sprite.fillSprite(gaugeData[GAUGE_SPEED].color);          // Fill the Sprite with black //gaugeData[GAUGE_SPEED].color
+  sprite.setFreeFont(FSSB9);
+  sprite.setTextColor(COLOR_WHITE);
+  sprite.setTextDatum(MC_DATUM);
+  sprite.drawNumber(spd, 18, 8);                            // Draw current speed in km/h
+  sprite.pushSprite(gaugeData[GAUGE_SPEED].x - 18, gaugeData[GAUGE_SPEED].y - 8, COLOR_TRANSPARENT);
+  sprite.fillSprite(COLOR_BACKGROUND);                      // Draw current step
+  sprite.setFreeFont(FSS7);
+  sprite.drawNumber(stp, 18, 8);
+  sprite.pushSprite(gaugeData[GAUGE_SPEED].x - 18, gaugeData[GAUGE_SPEED].y + 44, COLOR_TRANSPARENT);
+  sprite.deleteSprite();
+}
+
+
+void drawSpeedoStep() {
+  uint16_t stp;
+  stp = getCurrentStep();
+  sprite.setColorDepth(16);                                 // Create an 16bpp Sprite
+  sprite.createSprite(36, 16);                              // 8bpp requires 36 * 16 = 576 bytes * 2
+  sprite.fillSprite(COLOR_BACKGROUND);                      // Draw current step
+  sprite.setFreeFont(FSS7);
+  sprite.setTextColor(COLOR_WHITE);
+  sprite.setTextDatum(MC_DATUM);
+  sprite.drawNumber(stp, 18, 8);
+  sprite.pushSprite(gaugeData[GAUGE_SPEEDO].x - 18, gaugeData[GAUGE_SPEEDO].y + 20, COLOR_TRANSPARENT);
+  sprite.deleteSprite();
+}
+
+
+uint16_t countLocoInStack() {
+  uint16_t pos, total;
+  total = 0;
+  pos = 0;
+  while ((locoStack[pos++] > 0) && (pos < LOCOS_IN_STACK))
+    total++;
+  return total;
+}
+
+
+void prepareLocoList() {
+  uint16_t pos;
+  for (pos = 0; pos < 6; pos++) {                           // delete list
+    txtData[TXT_SEL_ADDR1 + pos].buf[0] = '\0';
+    txtData[TXT_SEL_NAME1 + pos].buf[0] = '\0';
+  }
+  encoderValue = 0;                                         // count locos in stack
+  encoderMax = countLocoInStack();
+  DEBUG_MSG("Locos in list: %d", encoderMax);
+  if (encoderMax > 0)
+    encoderMax--;
+  sortLocoList(SORT_LAST);
+  populateLocoList();
+}
+
+
+void populateLocoList() {
+  uint16_t posName;
+  uint16_t line, adr, n;
+  for (n = 0; n < 6; n++) {
+    if (n < encoderMax + 1) {
+      line = (encoderValue > 5) ? encoderValue - 5 : 0;
+      adr = sortedLocoStack[line + n];
+      posName = findLocoPos(adr);
+      //DEBUG_MSG("Enc: %d Line: %d Adr: %d", encoderValue, line, adr);
+      if (useID)
+        snprintf(txtData[TXT_SEL_ADDR1 + n].buf, ADDR_LNG + 1, "%d", locoData[posName].myAddr.address);
+      else
+        snprintf(txtData[TXT_SEL_ADDR1 + n].buf, ADDR_LNG + 1, "%d", adr);
+      if (posName != LOCOS_IN_STACK)
+        snprintf(txtData[TXT_SEL_NAME1 + n].buf, NAME_LNG + 1, locoData[posName].myName);
+    }
+  }
+  line = (encoderValue > 5) ? 5 : encoderValue;
+  for (n = 0; n < 6; n++) {
+    txtData[TXT_SEL_ADDR1 + n].backgnd = (n == line) ? COLOR_YELLOW : COLOR_WHITE;
+    txtData[TXT_SEL_NAME1 + n].backgnd = (n == line) ? COLOR_YELLOW : COLOR_WHITE;
+  }
+}
+
+
+uint16_t findLocoPos(uint16_t loco) {
+  uint16_t pos, n;
+  pos = LOCOS_IN_STACK;
+  for (n = 0; n < LOCOS_IN_STACK; n++) {
+    if (useID) {
+      if (locoData[n].myLocoID  == loco)                    // search ID in loco stack
+        pos = n;
+    }
+    else {
+      if (locoData[n].myAddr.address  == loco)              // search address in loco stack
+        pos = n;
+    }
+  }
+  return pos;
+}
+
+
+void sortLocoList (uint16_t order) {
+  uint16_t tmp, n, i, j, total, pos;
+  bool reverse;
+#ifdef DEBUG
+  Serial.print(F("INI.STACK: "));
+  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
+    Serial.print(sortedLocoStack[pos]);
+    Serial.print(' ');
+  }
+  Serial.println();
+#endif
+  objStack[posObjStack1].objID = ICON_LAST_UP + order;
+  currOrder = order;
+  total = countLocoInStack();
+  reverse = false;
+  //DEBUG_MSG("Order %d Total %d", currOrder, total)
+  switch (order) {
+    case SORT_LAST:
+      for (n = 0; n < LOCOS_IN_STACK; n++)
+        sortedLocoStack[n] = locoStack[n];
+      break;
+    case SORT_NUM_DWN:
+      reverse = true;
+    case SORT_NUM_UP:
+      for (i = 1; i < total; i++) {
+        if (useID) {
+          for (j = i; j > 0 && (idOrder(sortedLocoStack[j - 1], sortedLocoStack[j]) != reverse); j--) {
+            tmp = sortedLocoStack[j - 1];
+            sortedLocoStack[j - 1] = sortedLocoStack[j];
+            sortedLocoStack[j] = tmp;
+          }
+        }
+        else {
+          for (j = i; j > 0 && ((sortedLocoStack[j - 1] > sortedLocoStack[j]) != reverse); j--) {
+            tmp = sortedLocoStack[j - 1];
+            sortedLocoStack[j - 1] = sortedLocoStack[j];
+            sortedLocoStack[j] = tmp;
+          }
+        }
+      }
+      break;
+    case SORT_NAME_DWN:
+      reverse = true;
+    case SORT_NAME_UP:
+      for (i = 1; i < total; i++) {
+        for (j = i; j > 0 && (nameOrder(sortedLocoStack[j - 1], sortedLocoStack[j]) != reverse); j--) {
+          tmp = sortedLocoStack[j - 1];
+          sortedLocoStack[j - 1] = sortedLocoStack[j];
+          sortedLocoStack[j] = tmp;
+        }
+      }
+      break;
+  }
+#ifdef DEBUG
+  Serial.print(F("END.STACK: "));
+  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
+    Serial.print(sortedLocoStack[pos]);
+    Serial.print(' ');
+  }
+  Serial.println();
+#endif
+}
+
+
+bool nameOrder(uint16_t first, uint16_t second) {
+  uint16_t posFirst, posSecond;
+  posFirst = findLocoPos(first);
+  posSecond = findLocoPos(second);
+  return strcmp(locoData[posFirst].myName, locoData[posSecond].myName) > 0;
+}
+
+
+bool idOrder(uint16_t first, uint16_t second) {
+  uint16_t posFirst, posSecond;
+  posFirst = findLocoPos(first);
+  posSecond = findLocoPos(second);
+  return (locoData[posFirst].myAddr.address > locoData[posSecond].myAddr.address);
+}
+
+
+////////////////////////////////////////////////////////////
+// ***** SOPORTE GUI *****
+////////////////////////////////////////////////////////////
+
+void setBitsCV() {
+  uint16_t n;
+  for (n = 0; n < 8; n++) {
+    buttonData[BUT_CV_0 + n].backgnd = bitRead(CVdata, n) ? COLOR_BLUE : COLOR_DARKGREY;
+    charData[CHAR_CV_0 + n].color = bitRead(CVdata, n) ? COLOR_WHITE : COLOR_BROWN;
+  }
+}
+
+
+void setFieldsCV() {
+  txtData[TXT_CV].backgnd = enterCVdata ? COLOR_WHITE : COLOR_YELLOW;
+  txtData[TXT_CV_VAL].backgnd = enterCVdata ? COLOR_YELLOW : COLOR_WHITE;
+  keybData[KEYB_CV].idTextbox = enterCVdata ? TXT_CV_VAL : TXT_CV;
+  snprintf(keybCvBuf, ADDR_LNG + 1, "%d", CVaddress);
+  if (CVdata > 255) {
+    keybCvValBuf[0] = '\0';
+    CVdata = 0;
+    txtData[TXT_CV_VAL].backgnd = COLOR_PINK;
+  }
+  else
+    snprintf(keybCvValBuf, IP_LNG + 1, "%d", CVdata);
+}
+
+void showFieldsCV() {
+  uint16_t n;
+  newEvent(OBJ_TXT, TXT_CV, EVNT_DRAW);
+  newEvent(OBJ_TXT, TXT_CV_VAL, EVNT_DRAW);
+  for (n = 0; n < 8; n++)
+    newEvent(OBJ_BUTTON, BUT_CV_0 + n, EVNT_DRAW);
+}
+
+void setFieldsLNCV() {
+  txtData[TXT_LNCV_ART].backgnd = (optLNCV == LNCV_ART) ? COLOR_YELLOW : COLOR_WHITE;
+  txtData[TXT_LNCV_MOD].backgnd = (optLNCV == LNCV_MOD) ? COLOR_YELLOW : COLOR_WHITE;
+  txtData[TXT_LNCV_ADR].backgnd = (optLNCV == LNCV_ADR) ? COLOR_YELLOW : COLOR_WHITE;
+  txtData[TXT_LNCV_VAL].backgnd = (optLNCV == LNCV_VAL) ? COLOR_YELLOW : COLOR_WHITE;
+  switch (optLNCV) {
+    case LNCV_ART:
+      keybData[KEYB_LNCV].idTextbox = TXT_LNCV_ART;
+      break;
+    case LNCV_MOD:
+      keybData[KEYB_LNCV].idTextbox = TXT_LNCV_MOD;
+      break;
+    case LNCV_ADR:
+      keybData[KEYB_LNCV].idTextbox = TXT_LNCV_ADR;
+      break;
+    case LNCV_VAL:
+      keybData[KEYB_LNCV].idTextbox = TXT_LNCV_VAL;
+      break;
+
+  }
+  snprintf(keybLncvArtBuf, PORT_LNG + 1, "%d", artNum);
+  snprintf(keybLncvModBuf, PORT_LNG + 1, "%d", modNum);
+  snprintf(keybLncvAdrBuf, PORT_LNG + 1, "%d", numLNCV);
+  snprintf(keybLncvValBuf, PORT_LNG + 1, "%d", valLNCV);
+}
+
+void showFieldsLNCV() {
+  newEvent(OBJ_TXT, TXT_LNCV_ART, EVNT_DRAW);
+  newEvent(OBJ_TXT, TXT_LNCV_MOD, EVNT_DRAW);
+  newEvent(OBJ_TXT, TXT_LNCV_ADR, EVNT_DRAW);
+  newEvent(OBJ_TXT, TXT_LNCV_VAL, EVNT_DRAW);
+}
+
+
+void setStatusCV() {
+  uint16_t num;
+  char buf[MAX_LABEL_LNG];
+  num = 0;
+  if (CVdata > 255) {
+    num = LBL_CV_ERROR;
+    txtData[TXT_CV_STATUS].color = COLOR_RED;
+  }
+  else {
+    txtData[TXT_CV_STATUS].color = COLOR_BLUE;
+    switch (CVaddress) {
+      case 1:
+      case 17:
+      case 18:
+      case 19:
+        num = LBL_CV_ADDR;
+        break;
+      case 2:
+        num = LBL_CV_SPD_L;
+        break;
+      case 3:
+        num = LBL_CV_ACC;
+        break;
+      case 4:
+        num = LBL_CV_DEC;
+        break;
+      case 5:
+        num = LBL_CV_SPD_H;
+        break;
+      case 6:
+        num = LBL_CV_SPD_M;
+        break;
+      case 541:
+      case 29:
+        num = LBL_CV_CFG;
+        break;
+      case 520:
+      case 8:
+        switch (CVdata) {                                   // imprime el fabricante conocido
+          case 13:
+            sprintf(buf, "DIY");
+            break;
+          case 74:
+            sprintf(buf, "PpP");
+            break;
+          case 42:
+            sprintf(buf, "Digikeijs");
+            break;
+          case 151:
+            sprintf(buf, "ESU");
+            break;
+          case 145:
+            sprintf(buf, "Zimo");
+            break;
+          case 99:
+            sprintf(buf, "Lenz");
+            break;
+          case 97:
+            sprintf(buf, "D&H");
+            break;
+          case 157:
+            sprintf(buf, "Kuehn");
+            break;
+          case 62:
+            sprintf(buf, "Tams");
+            break;
+          case 85:
+            sprintf(buf, "Uhlenbrock");
+            break;
+          case 134:
+            sprintf(buf, "Lais");
+            break;
+          case 129:
+            sprintf(buf, "Digitrax");
+            break;
+          case 161:
+            sprintf(buf, "Roco");
+            break;
+          case 109:
+            sprintf(buf, "Viessmann");
+            break;
+          case 78:
+            sprintf(buf, "Train-O-matic");
+            break;
+          case 117:
+            sprintf(buf, "CT Elektronik");
+            break;
+          default:
+            num = LBL_CV_MAN;
+            break;
+        }
+        break;
+      default:
+        num = LBL_MENU_CV;
+        break;
+    }
+  }
+  if (num > 0)
+    getLabelTxt(num, buf);
+  snprintf(cvStatusBuf, PWD_LNG + 1, "%s", buf);
+}
+
+
+void setTextSpeedo() {
+  uint8_t index;
+  char scaleName[5];
+  switch (speedoScale) {
+    case 87:
+      index = LBL_SCALE_H0;
+      break;
+    case 160:
+      index = LBL_SCALE_N;
+      break;
+    case 120:
+      index = LBL_SCALE_TT;
+      break;
+    case 220:
+      index = LBL_SCALE_Z;
+      break;
+    case 45:
+      index = LBL_SCALE_0;
+      break;
+    default:
+      index = 0;
+  }
+  scaleName[0] = '\0';
+  if (index > 0)
+    getLabelTxt(index, scaleName);
+  snprintf(spdScaleBuf, NAME_LNG + 1, "%s  1:%d", scaleName, speedoScale);
+  snprintf(spdSelScaleBuf, NAME_LNG + 1, "%s  1:", scaleName);
+  snprintf(spdSelScaleNumBuf, ADDR_LNG + 1, "%d", speedoScale);
+}
+
+void setScaleSpeedo(uint16_t value) {
+  speedoScale = value;
+  setTextSpeedo();
+  drawObject(OBJ_TXT, TXT_EDIT_SCALE);
+  drawObject(OBJ_TXT, TXT_NUM_SCALE);
+}

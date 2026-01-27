@@ -1,0 +1,9 @@
+## Copyright
+Copyright (c) 2025-2026 Paco Cañada, [The Pows](https://usuaris.tinet.cat/fmco/)   
+All rights reserved.
+
+## License
+Proprietary.  
+Sources are only provided to compile and upload to the device.    
+Modifiyng source code or forking/publishing this project ist not allowed.  
+Commercial use is forbidden. 
