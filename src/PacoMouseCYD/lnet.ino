@@ -529,6 +529,7 @@ void showTrkLnet(uint8_t trk) {
     if (trk & GTRK_POWER) {                                         // Normal power on
       stopTimer (TMR_POWER);
       iconData[ICON_POWER].color = COLOR_GREEN;
+      setColorRGB(LED_RGB_GREEN);
       if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
         newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
       if (isWindow(WIN_STA_PLAY)) {
@@ -548,6 +549,7 @@ void showTrkLnet(uint8_t trk) {
     else {
       iconData[ICON_POWER].color = COLOR_RED;                       // Power off
       setTimer (TMR_POWER, 5, TMR_PERIODIC);                        // Flash power icon
+      setColorRGB(LED_RGB_RED);
       if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
         newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
       if (isWindow(WIN_STA_PLAY)) {
@@ -578,6 +580,7 @@ void showTrkLnet(uint8_t trk) {
 void lnetDecode (lnMsg * LnPacket) {
   unsigned int adr;
   uint8_t slotStatus, i, n, msgLen;
+  bool state;
 
 #ifdef DEBUG
   msgLen = getLnMsgSize(LnPacket);                                  // imprime paquete
@@ -650,7 +653,6 @@ void lnetDecode (lnMsg * LnPacket) {
           case 0x07:
             updateUhliF5F11(LnPacket->data[4]);
             break;
-
           case 0x08:
             updateUhliF13F19(LnPacket->data[4]);
             break;
@@ -658,35 +660,24 @@ void lnetDecode (lnMsg * LnPacket) {
             updateUhliF21F27(LnPacket->data[4]);
             break;
         }
-        /*
-          if (LnPacket->data[3] == 0x07) {                                                  // F5..F11          // Used only by Intellibox-I ("one") version 2.x
-          locoData[myLocoData].myFunc.Bits &= 0xFFFFF01F;
-          locoData[myLocoData].myFunc.Bits |= ((unsigned long)(LnPacket->data[4] & 0x7F) << 5);
-          }
-          if (LnPacket->data[3] == 0x05) {                                                  // F12,F20,F28      // Common to Intellibox-I and -II
-          bitWrite(locoData[myLocoData].myFunc.Bits, 12, bitRead(LnPacket->data[4], 4));
-          bitWrite(locoData[myLocoData].myFunc.Bits, 20, bitRead(LnPacket->data[4], 5));
-          bitWrite(locoData[myLocoData].myFunc.Bits, 28, bitRead(LnPacket->data[4], 6));
-          }
-          if (LnPacket->data[3] == 0x08) {                                                  // F13..F19         // Common to Intellibox-I and -II
-          locoData[myLocoData].myFunc.Bits &= 0xFFF01FFF;
-          locoData[myLocoData].myFunc.Bits |= ((unsigned long)(LnPacket->data[4] & 0x7F) << 13); // ---87654 32109876 54321098 76543210
-          }
-          if (LnPacket->data[3] == 0x09) {                                                  // F21..F27         // Common to Intellibox-I and -II
-          locoData[myLocoData].myFunc.Bits &= 0xF01FFFFF;
-          locoData[myLocoData].myFunc.Bits |= ((unsigned long)(LnPacket->data[4] & 0x7F) << 21);
-          }
-          if (LnPacket->data[3] == 0x06) {                                                  // F0..F4           // Used only by Intellibox-I ("one") version 2.x
-          locoData[myLocoData].myFunc.Bits &= 0xFFFFFFE0;
-          locoData[myLocoData].myFunc.Bits |= ((unsigned long)(LnPacket->data[4] & 0x0F) << 1);
-          bitWrite(locoData[myLocoData].myFunc.Bits, 0, bitRead(LnPacket->data[4], 4));
-        */
         updateFuncState(isWindow(WIN_THROTTLE));
       }
       break;
-
-
-
+    case OPC_SW_REQ:                                                // Alguien mueve un desvio (OPC_SW_REQ)
+      adr = (LnPacket->srq.sw1 | ((LnPacket->srq.sw2 & 0x0F) << 7));
+      adr++;
+      state = (LnPacket->srq.sw2 & OPC_SW_REQ_DIR) ? true : false;
+      accessoryChange(adr, state);
+      break;
+    case OPC_SW_REP:                                                // Turnout SENSOR state REPORT (OPC_SW_REP)
+      adr = (LnPacket->srp.sn1 | ((LnPacket->srp.sn2 & 0x0F) << 7));
+      adr++;
+      if (LnPacket->srp.sn2 & OPC_SW_REP_INPUTS)
+        state = (LnPacket->srp.sn2 & OPC_SW_REP_SW) ? true : false;       // input levels for turnout feedback
+      else
+        state = (LnPacket->srp.sn2 & OPC_SW_REP_CLOSED) ? true : false;   // output levels for turnout feedback
+      accessoryChange(adr, state);
+      break;
     case OPC_IMM_PACKET:
       if ((LnPacket->sp.mesg_size == 0x0B) && (LnPacket->sp.val7f == 0x7F)) {
         if (bitRead(LnPacket->sp.dhi, 0)) {
@@ -740,10 +731,6 @@ void lnetDecode (lnMsg * LnPacket) {
         locoData[myLocoData].mySpeed = LnPacket->sd.spd;                            // actualiza velocidad
         locoData[myLocoData].myDir = (((LnPacket->sd.dirf << 2) ^ 0x80) & 0x80);    // actualiza sentido   (LnPacket->sd.dirf << 2) & 0x80;
         updateUhliF0F4(LnPacket->sd.dirf);
-        /*
-          locoData[myLocoData].myFunc.xFunc[0] |= ((LnPacket->sd.dirf & 0x0F) << 1);
-          locoData[myLocoData].myFunc.xFunc[0] |= ((LnPacket->sd.dirf >> 4) & 0x01);
-        */
         locoData[myLocoData].myFunc.Bits &= 0xFFFFFE1F;             // F5..F8
         locoData[myLocoData].myFunc.xFunc[0] |= ((LnPacket->sd.snd & 0x07) << 5);
         bitWrite(locoData[myLocoData].myFunc.Bits, 8, bitRead(LnPacket->sd.snd, 3));
@@ -1173,6 +1160,7 @@ void sendLNCV (byte id, byte flags) {
   0xE7, 0x0E, 0x00, 0x03, 0x00, 0x03, 0x00, 0x06, 0x08, 0x00, 0x00, 0x49, 0x42, 0x13  "DR5000"                                ADR: 0    ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x03, 0x00, 0x03, 0x00, 0x07, 0x08, 0x00, 0x00, 0x49, 0x42, 0x12  "YD7001"                                ADR: 0    ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Intellibox II / IB-Basic / IB-Com"     ADR: 'B'  ID: 'IB'  SPD: 3
+  0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Intellibox2neo"                        ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x06, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4D  "System Control 7"                      ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Daisy II Tillig"                       ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Daisy II WLAN"                         ADR: 'B'  ID: 'IB'  SPD: 3

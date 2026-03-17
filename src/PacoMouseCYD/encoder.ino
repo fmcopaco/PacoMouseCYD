@@ -44,6 +44,40 @@ void readButtons () {
     if (statusSwitch == LOW)
       switchOn = true;
   }
+  inputButton = digitalRead (SW_BOOT_PIN);                            // comprueba cambio en boton BOOT
+  if (statusBOOT != inputButton) {
+    statusBOOT = inputButton;
+    if (statusBOOT == LOW) {
+      newEvent(OBJ_DATA, DATA_SW_BOOT, EVNT_PRESS);
+      DEBUG_MSG("BOOT switch pressed...")
+    }
+  }
+#if (USE_RGB_LED == FUNC_BUTTONS)
+  inputButton = digitalRead (RGB_LED_R);                            // comprueba cambio en boton BOOT
+  if (statusSW_R != inputButton) {
+    statusSW_R = inputButton;
+    if (statusSW_R == LOW) {
+      newEvent(OBJ_DATA, DATA_SW_R, EVNT_PRESS);
+      DEBUG_MSG("R switch pressed...")
+    }
+  }
+  inputButton = digitalRead (RGB_LED_G);                            // comprueba cambio en boton BOOT
+  if (statusSW_G != inputButton) {
+    statusSW_G = inputButton;
+    if (statusSW_G == LOW) {
+      newEvent(OBJ_DATA, DATA_SW_G, EVNT_PRESS);
+      DEBUG_MSG("G switch pressed...")
+    }
+  }
+  inputButton = digitalRead (RGB_LED_B);                            // comprueba cambio en boton BOOT
+  if (statusSW_B != inputButton) {
+    statusSW_B = inputButton;
+    if (statusSW_B == LOW) {
+      newEvent(OBJ_DATA, DATA_SW_B, EVNT_PRESS);
+      DEBUG_MSG("B switch pressed...")
+    }
+  }
+#endif
 }
 
 
@@ -64,8 +98,14 @@ void controlEncoder() {                                           // encoder mov
       break;
     case WIN_THROTTLE:
     case WIN_SPEEDO:
+    case WIN_ACCESSORY:
+    case WIN_PANELS:
+      updateMySpeed();
+      break;
     case WIN_STA_PLAY:
       updateMySpeed();
+      gaugeData[GAUGE_STATION].value = map(encoderValue, 0, encoderMax, 0, 255);
+      drawObject(OBJ_GAUGE, GAUGE_STATION);
       break;
     case WIN_CHG_FUNC:
       fncData[FNC_CHG].idIcon = encoderValue * 2;
@@ -109,7 +149,7 @@ void controlSwitch() {                                            // encoder swi
   DEBUG_MSG("Encoder Switch");
   switch (objStack[lastWinStack].objID) {
     case WIN_SSID:
-      snprintf (wifiSetting.ssid, 32, WiFi.SSID(scrSSID).c_str());     //saveSSID(scrSSID);
+      snprintf (wifiSetting.ssid, 33, WiFi.SSID(scrSSID).c_str());     //saveSSID(scrSSID);
       DEBUG_MSG("New SSID: %s", wifiSetting.ssid);
       eepromChanged = true;
       closeWindow(WIN_SSID);
@@ -117,6 +157,8 @@ void controlSwitch() {                                            // encoder swi
       break;
     case WIN_THROTTLE:
     case WIN_STA_PLAY:
+    case WIN_ACCESSORY:
+    case WIN_PANELS:
       if (encoderValue > 0) {
         encoderValue = 0;
         if (stopMode > 0)
@@ -194,4 +236,131 @@ void controlSwitch() {                                            // encoder swi
       accTypeClick();
       break;
   }
+}
+
+
+void setActionOption(uint8_t actionSW, uint8_t pos) {
+  if (actionSW < ACT_F0)
+    getLabelOption(LBL_ACTIONS, keybActionBuf[pos], actionSW);
+  else
+    snprintf(keybActionBuf[pos], NAME_LNG + 1, "F%d", actionSW - ACT_F0);
+}
+
+uint8_t getActionOption(uint16_t adr) {
+  uint8_t actionSW;
+  actionSW = EEPROM.read(adr);                      // get button action
+  if (actionSW > ACT_F28)
+    actionSW = (adr == EE_ACT_BOOT) ? ACT_CALIBRATE : ACT_UNDEF;
+  return actionSW;
+}
+
+void doAction(uint8_t actionSW) {
+  uint8_t n;
+  uint16_t value;
+  DEBUG_MSG("ACTION: %d", actionSW)
+  switch (actionSW) {
+    case ACT_UNDEF:
+      n = 0;
+      break;
+    case ACT_CALIBRATE:
+      startCalibration();
+      break;
+    case ACT_STOP:
+      if (notLocked())
+        togglePower();
+      break;
+    case ACT_SHUNTING:
+      shuntingMode = !shuntingMode;
+      if (isWindow(WIN_THROTTLE))
+        updateSpeedDir();
+      break;
+    case ACT_NEXT:
+      if (isWindow(WIN_THROTTLE))
+        showNextFuncBlock();
+      if (isWindow(WIN_STEAM)) {
+        if (barData[BAR_JOHNSON].value < 6) {
+          barData[BAR_JOHNSON].value++;
+          newEvent(OBJ_BAR, BAR_JOHNSON, EVNT_DRAW);
+        }
+      }
+      if (isWindow(WIN_ACCESSORY)) {
+        if ((!editAccessory) && (currPanel < 15)) {
+          if (accPanelChanged) {
+            accPanelChanged = false;
+            if (sdDetected)
+              saveCurrAccPanel(SD);
+            else
+              saveCurrAccPanel(LittleFS);
+          }
+          saveCurrentAspects();
+          currPanel++;
+          populateAccPanel();
+          newEvent(OBJ_WIN, WIN_ACCESSORY, EVNT_DRAW);
+        }
+      }
+      if (isWindow(WIN_SCREEN)) {
+        value = (barData[BAR_BLIGHT].value < 0xF0) ? barData[BAR_BLIGHT].value + 0x10 : 0xFF;
+        barData[BAR_BLIGHT].value = value;
+        setBacklight (value);
+        backlight = value;
+        newEvent(OBJ_BAR, BAR_BLIGHT, EVNT_DRAW);
+      }
+      break;
+    case ACT_PREV:
+      if (isWindow(WIN_THROTTLE))
+        showPrevFuncBlock();
+      if (isWindow(WIN_STEAM)) {
+        if (barData[BAR_JOHNSON].value > 0) {
+          barData[BAR_JOHNSON].value--;
+          newEvent(OBJ_BAR, BAR_JOHNSON, EVNT_DRAW);
+        }
+      }
+      if (isWindow(WIN_ACCESSORY)) {
+        if ((!editAccessory) && (currPanel > 0)) {
+          if (accPanelChanged) {
+            accPanelChanged = false;
+            if (sdDetected)
+              saveCurrAccPanel(SD);
+            else
+              saveCurrAccPanel(LittleFS);
+          }
+          saveCurrentAspects();
+          currPanel--;
+          populateAccPanel();
+          newEvent(OBJ_WIN, WIN_ACCESSORY, EVNT_DRAW);
+        }
+      }
+      if (isWindow(WIN_SCREEN)) {
+        value = (barData[BAR_BLIGHT].value > (USER_MIN_BL + 0x0F)) ? barData[BAR_BLIGHT].value - 0x10 : USER_MIN_BL;
+        barData[BAR_BLIGHT].value = value;
+        setBacklight (value);
+        backlight = value;
+        newEvent(OBJ_BAR, BAR_BLIGHT, EVNT_DRAW);
+      }
+      break;
+    default:                                        // Function key
+      n = actionSW - ACT_F0;
+      locoData[myLocoData].myFunc.Bits ^= bit(n);
+      funcOperations(n);
+      updateFuncState(isWindow(WIN_THROTTLE));
+      break;
+  }
+}
+
+uint8_t nextAction (uint8_t actionSW, uint8_t pos, uint16_t txt) {
+  if (actionSW < ACT_F28) {
+    actionSW++;
+    setActionOption(actionSW, pos);
+    newEvent(OBJ_TXT, txt, EVNT_DRAW);
+  }
+  return actionSW;
+}
+
+uint8_t prevAction (uint8_t actionSW, uint8_t pos, uint16_t txt) {
+  if (actionSW > 0) {
+    actionSW--;
+    setActionOption(actionSW, pos);
+    newEvent(OBJ_TXT, txt, EVNT_DRAW);
+  }
+  return actionSW;
 }

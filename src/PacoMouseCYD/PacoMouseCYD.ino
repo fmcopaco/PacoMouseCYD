@@ -32,15 +32,17 @@
        v0.7     23nov25   Corrected bugs on loconet steam direction. Added accessory panels. Added WiFi analyzer.
        v0.8     15dec25   Added ECoS/CS1 protocol. Updated user defined CYDs. Changes in modal windows.
        v0.9     03jan26   Added Station Run for kids. Corrected minor bugs on loconet
+       v0.10    12feb26   Correct little bugs, clean and made more coherent code. Updating accessories. Status RGB LED. Up to 4 WiFi networks. Control of loco in accessory panel. Define actions for buttons. Added Czech language. Update from SD.
 */
 
 // PacoMouseCYD program version
 #define VER_H "0"
-#define VER_L "9"
-#define VER_R "c"
+#define VER_L "10"
+#define VER_R "d"
 
 
 //#define DEBUG                                               // Descomentar para mensajes de depuracion
+//#define SCREEN_SEND                                         // Reads a screen image off the TFT and send it to a processing client sketch over the serial port https://github.com/Bodmer/TFT_eSPI
 
 // Libraries
 
@@ -59,12 +61,13 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "lnet.h"                                           // PacoMouseCYD LNTCP
+#include <Update.h>
 
 
 #ifdef DEBUG
-char output[80];
+char output[120];
 
-#define DEBUG_MSG(...)  snprintf(output,80, __VA_ARGS__ );   \
+#define DEBUG_MSG(...)  snprintf(output, 120, __VA_ARGS__ );   \
   Serial.println(output);
 #else
 #define DEBUG_MSG(...)
@@ -102,13 +105,15 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 uint8_t backlight;
 uint8_t currBacklight;
 
-uint16_t oldNeedle;
+//uint16_t oldNeedle;
 
 #define USB_UP      2                                       // Display USB up
 #define USB_DOWN    0                                       // Display USB down
 
 uint8_t locationUSB;
+uint8_t activeRGB;
 
+enum colorRGB {LED_RGB_OFF, LED_RGB_BLUE, LED_RGB_RED, LED_RGB_GREEN = 4, LED_RGB_WHITE = 7};
 
 ////////////////////////////////////////////////////////////
 // ***** TOUCHSCREEN *****
@@ -116,11 +121,22 @@ uint8_t locationUSB;
 
 XPT2046_TS touchscreen(XPT2046_MOSI, XPT2046_MISO, XPT2046_CLK, XPT2046_CS);
 
-#define SW_BOOT 0                                           // BOOT button used to enter touchscreen calibration window
-
-bool bootPressed;
 bool calibrationPending;
 bool clickDetected = false;                                 // pulsacion detectada en panel tactil
+
+#define SW_BOOT_PIN 0                                       // BOOT button used to enter touchscreen calibration window or defined action
+
+enum fncSwitch {SW_BOOT, SW_LED_R, SW_LED_G, SW_LED_B};
+
+byte statusBOOT, statusSW_R, statusSW_G, statusSW_B;
+
+uint8_t actionSW_BOOT, actionSW_R, actionSW_G, actionSW_B;
+
+enum actionCmd {ACT_UNDEF, ACT_CALIBRATE, ACT_STOP, ACT_SHUNTING, ACT_NEXT, ACT_PREV,
+                ACT_F0, ACT_F1, ACT_F2, ACT_F3, ACT_F4, ACT_F5, ACT_F6, ACT_F7, ACT_F8, ACT_F9,
+                ACT_F10, ACT_F11, ACT_F12, ACT_F13, ACT_F14, ACT_F15, ACT_F16, ACT_F17, ACT_F18, ACT_F19,
+                ACT_F20, ACT_F21, ACT_F22, ACT_F23, ACT_F24, ACT_F25, ACT_F26, ACT_F27, ACT_F28,
+               };
 
 
 ////////////////////////////////////////////////////////////
@@ -149,14 +165,15 @@ unsigned long timeButtons;
 // ***** EEPROM *****
 ////////////////////////////////////////////////////////////
 
-#define EEPROM_SIZE         512
+#define EEPROM_SIZE         1024
 
 enum Settings {
   EE_XMIN_H, EE_XMIN_L, EE_XMAX_H, EE_XMAX_L, EE_YMIN_H, EE_YMIN_L, EE_YMAX_H, EE_YMAX_L, EE_BACKLIGHT, EE_LANGUAGE,
   EE_ADRH, EE_ADRL, EE_STOP_MODE, EE_SHUNTING, EE_ROCO, EE_LOCK, EE_SHORT, EE_USB_LOCATION, EE_CMD_STA, EE_CMD_AUTO,
   EE_STA_ADRH1, EE_STA_ADRL1, EE_STA_ADRH2, EE_STA_ADRL2, EE_STA_ADRH3, EE_STA_ADRL3, EE_STA_ADRH4, EE_STA_ADRL4,
-  EE_STA_TRNDEF, EE_STA_TRNNUM, EE_STA_NUM, EE_STA_TIME,
-  EE_WIFI,                                                  //  datos WiFi. (Tiene que ser el ultimo)
+  EE_STA_TRNDEF, EE_STA_TRNNUM, EE_STA_NUM, EE_STA_TIME, EE_RGB_LED, EE_ACT_BOOT, EE_ACT_R, EE_ACT_G, EE_ACT_B,
+  EE_UNDEF0, EE_UNDEF1, EE_UNDEF2, EE_UNDEF3, EE_UNDEF4,
+  EE_WIFI_NET, EE_WIFI,                                     //  datos WiFi. (Tiene que ser el ultimo)
 }; // EEPROM settings
 
 bool eepromChanged;
@@ -167,8 +184,9 @@ bool eepromChanged;
 ////////////////////////////////////////////////////////////
 
 struct {
+  char network[17];                                         // Network name
   char ssid[33];                                            // SSID
-  char password[65];                                        // Password
+  char password[33];                                        // Password
   IPAddress CS_IP;                                          // IP
   uint16_t port;                                            // Port
   bool serverType;                                          // Server type
@@ -231,7 +249,7 @@ uint8_t lastLanguage;
 ////////////////////////////////////////////////////////////
 
 enum initResult {INIT_OK, INIT_NO_SD, INIT_NO_WIFI, INIT_NO_CONNECT};
-enum Err {NO_ERROR, ERR_OFF, ERR_STOP, ERR_SERV, ERR_WAIT, ERR_FULL, ERR_CHG_WIFI, ERR_CV, ERR_ASK_SURE};
+enum Err {NO_ERROR, ERR_OFF, ERR_STOP, ERR_SERV, ERR_WAIT, ERR_FULL, ERR_CHG_WIFI, ERR_CV, ERR_ASK_SURE, ERR_FILE};
 
 byte errType;
 
@@ -335,7 +353,7 @@ uint8_t stateFIFO;
 
 // DESVIADO: ROJO  - > links  thrown
 // RECTO:    VERDE + < rechts closed
-enum posDesvio {NO_MOVIDO, DESVIADO, RECTO, INVALIDO};
+//enum posDesvio {NO_MOVIDO, DESVIADO, RECTO, INVALIDO};
 
 bool editAccessory;
 uint8_t currPanel;
@@ -390,7 +408,7 @@ typedef struct {
   uint16_t  addr2;
   char      accName[ACC_LNG + 1];
   uint8_t   currAspect;
-  uint16_t  activeOutput;                                             // '3A2G 3A2R 3A1G 3A1R  2A2G 2A2R 2A1G 2A1R  1A2G 1A2R 1A1G 1A1R  0A2G 0A2R 0A1G 0A1R'
+  uint16_t  activeOutput;                                   // '3A2G 3A2R 3A1G 3A1R  2A2G 2A2R 2A1G 2A1R  1A2G 1A2R 1A1G 1A1R  0A2G 0A2R 0A1G 0A1R'
 } panelElement;
 
 const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021, 0x4521, 0x0021, 0x0021, 0x0421, 0x8421, 0x0021, 0x0421, 0x0021, 0x0002, 0x0001, 0x0001, 0x0002, 0x0021, 0x0021, 0x0021, 0x0000};
@@ -398,6 +416,8 @@ const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021,
 panelElement accPanel[16];
 panelElement currAccEdit;
 uint8_t savedAspect[16][16];
+uint8_t accPosition[256];                                   // Accessories 1..2047 position (0: RED, 1: GREEN)
+
 
 ////////////////////////////////////////////////////////////
 // ***** SPEEDOMETER *****
@@ -482,6 +502,11 @@ uint16_t staTurnoutAdr3;
 uint16_t staTurnoutAdr4;
 uint8_t staTurnoutDef;
 bool staTurnoutPos[4];
+
+////////////////////////////////////////////////////////////
+// ***** NEXT TRAIN *****
+////////////////////////////////////////////////////////////
+
 
 
 ////////////////////////////////////////////////////////////
@@ -717,6 +742,9 @@ void setup() {
   DEBUG_MSG("Chip Model: %s \nFlash Chip Size: %lu", ESP.getChipModel(), ESP.getFlashChipSize())
   DEBUG_MSG("ESP_ARDUINO_VERSION: %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH)
 #endif
+#ifdef SCREEN_SEND
+  Serial.begin(115200);                                     // Set to a high rate for fast image transfer to a PC
+#endif
   initGUI();
   initVariables();
   sdDetected = SD.begin(SD_CS) ? true : false;
@@ -769,13 +797,6 @@ void loop() {
     eventProcess();
     DEBUG_MSG("New Event...")
   }
-  if (! bootPressed) {                                      // check BOOT button to enter Touchscreen Calibration
-    if (digitalRead(SW_BOOT) == LOW) {
-      bootPressed = true;
-      newEvent(OBJ_WIN, WIN_CALIBRATE, EVNT_BOOT);
-      DEBUG_MSG("BOOT switch pressed...")
-    }
-  }
   if (clickDetected) {                                      // only individual clicks
     if (! touchscreen.touched())
       clickDetected = false;
@@ -798,47 +819,63 @@ void loop() {
 ////////////////////////////////////////////////////////////
 
 void initVariables() {
-  byte pos;
-  uint16_t xm, xM, ym, yM, value;
+  uint16_t xm, xM, ym, yM, value, pos;
   EEPROM.begin(EEPROM_SIZE);
   eepromChanged = false;
-  currLanguage = EEPROM.read(EE_LANGUAGE);
+  currLanguage = EEPROM.read(EE_LANGUAGE);                  // language
   if (currLanguage >= MAX_LANG)
     currLanguage = LANG_ENGLISH;
-  bootPressed = false;
   calibrationPending = false;
-  EEPROM.get (EE_WIFI, wifiSetting);                        // read WiFi settings
-  if (wifiSetting.ok != 0x464D) {                           // check correct EEPROM signature
-    snprintf (wifiSetting.ssid, 32, "");                    // init WiFi settings
-    snprintf (wifiSetting.password, 64, "12345678");
-    wifiSetting.CS_IP = IPAddress(192, 168, 0, 111);
-    wifiSetting.port = 1234;
-    wifiSetting.serverType = true;
-    wifiSetting.protocol = CLIENT_Z21;
-    wifiSetting.ok = 0x464D;
-    EEPROM.put(EE_WIFI, wifiSetting);                       // also init calibration values
-    touchscreen.setCalibration(0, 4095, 0, 4095);           // set default calibration values
-    saveCalibrationValues();                                // save all
-    DEBUG_MSG("Setting default WiFi & calibration values");
+  for (pos = 0; pos < 4; pos++) {                           // WiFi networks
+    value = EE_WIFI + (pos * sizeof(wifiSetting));
+    EEPROM.get (value, wifiSetting);                        // read WiFi settings
+    if (wifiSetting.ok != 0x464D) {                         // check correct EEPROM signature
+      snprintf (wifiSetting.network, 16, "WiFi %d", pos + 1); // init WiFi network name
+      snprintf (wifiSetting.ssid, 32, "");                  // init WiFi settings
+      snprintf (wifiSetting.password, 64, "12345678");
+      wifiSetting.CS_IP = IPAddress(192, 168, 0, 111);
+      wifiSetting.port = 1234;
+      wifiSetting.serverType = true;
+      wifiSetting.protocol = CLIENT_Z21;
+      wifiSetting.ok = 0x464D;
+      EEPROM.put(value, wifiSetting);                       // also init calibration values
+      touchscreen.setCalibration(0, 4095, 0, 4095);         // set default calibration values
+      saveCalibrationValues();                              // save all
+      DEBUG_MSG("Setting default WiFi %d & calibration values", pos);
+    }
+    snprintf (networkNamesBuf[pos], NAME_LNG + 1, "%s", wifiSetting.network);
+    DEBUG_MSG("%d - %d - %s", pos, value, wifiSetting.network)
   }
+  pos = EEPROM.read(EE_WIFI_NET) & 0x03;                    // read current WiFi settings
+  radioData[RAD_NETWORKS].value = pos;
+  value = EE_WIFI + (pos * sizeof(wifiSetting));
+  EEPROM.get (value, wifiSetting);
   xm = (EEPROM.read(EE_XMIN_H) << 8) + EEPROM.read(EE_XMIN_L);
   xM = (EEPROM.read(EE_XMAX_H) << 8) + EEPROM.read(EE_XMAX_L);
   ym = (EEPROM.read(EE_YMIN_H) << 8) + EEPROM.read(EE_YMIN_L);
   yM = (EEPROM.read(EE_YMAX_H) << 8) + EEPROM.read(EE_YMAX_L);
   touchscreen.setCalibration(xm, xM, ym, yM);               // set calibration values
   DEBUG_MSG("xMin: %d, xMax: %d, yMin: %d, yMax: %d", xm, xM, ym, yM);
-  backlight = EEPROM.read(EE_BACKLIGHT);
+  backlight = EEPROM.read(EE_BACKLIGHT);                    // LEDs
   if (backlight < USER_MIN_BL)
     backlight = USER_MIN_BL;
   locationUSB = EEPROM.read(EE_USB_LOCATION);
   if (locationUSB > 0)
     locationUSB = USB_UP;
+  activeRGB = EEPROM.read(EE_RGB_LED);
+  actionSW_BOOT = ACT_UNDEF;                                 // buttons & encoder
+  actionSW_R = ACT_UNDEF;
+  actionSW_G = ACT_UNDEF;
+  actionSW_B = ACT_UNDEF;
+  statusBOOT = LOW;
+  statusSW_R = LOW;
+  statusSW_G = LOW;
+  statusSW_B = LOW;
   timeButtons = millis();
   lastTimeEncoder = millis();
   encoderValue = 0;
   encoderMax   = 2;
   encoderNeedService = false;
-  oldNeedle = 0;
   initFIFO();                                               // accessories
   editAccessory = false;
   accPanelChanged = false;
@@ -927,591 +964,6 @@ void setSpeedoPhase(uint8_t phase) {
   drawObject(OBJ_ICON, ICON_SPEEDO_LOK);
 }
 
-////////////////////////////////////////////////////////////
-// ***** SOPORTE LOCOMOTORAS *****
-////////////////////////////////////////////////////////////
-
-uint16_t checkLocoAddress(uint16_t loco) {
-  if (useID) {
-  }
-  else {
-    loco &= 0x3FFF;
-    if ((loco > 9999) || (loco == 0))                       // Comprueba que este entre 1 y 9999
-      loco = 3;
-  }
-  //DEBUG_MSG("Loco: %d", loco);
-  return loco;
-}
-
-
-void pushLoco(unsigned int loco) {                          // mete locomotora en el stack
-  byte pos;
-  unsigned int adr;
-  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {              // busca loco en stack
-    if (locoStack[pos] == loco)
-      locoStack[pos] = 0;                                   // evita que se repita
-  }
-  pos = 0;
-  do {
-    adr = locoStack[pos];                                   // push the loco in stack
-    locoStack[pos] = loco;
-    loco = adr;
-    pos++;
-  } while ((adr > 0) && (pos < LOCOS_IN_STACK));
-#ifdef DEBUG
-  Serial.print(F("STACK: "));
-  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
-    Serial.print(locoStack[pos]);
-    Serial.print(' ');
-  }
-  Serial.println();
-#endif
-}
-
-void popLoco(unsigned int loco) {                           // elimina locomotora del stack
-  byte pos, n;
-  unsigned int adr;
-  pos = LOCOS_IN_STACK;
-  for (n = 0; n < LOCOS_IN_STACK; n++) {                    // busca loco en stack
-    if (locoStack[n] == loco)
-      pos = n;                                              // save position
-  }
-  if (pos != LOCOS_IN_STACK) {
-    for (n = pos; n < (LOCOS_IN_STACK - 1); n++) {
-      locoStack[n] = locoStack[n + 1];
-    }
-    locoStack[LOCOS_IN_STACK - 1] = 0;
-  }
-}
-
-void initLocos() {
-  uint16_t pos;
-  myLocoData = 0;
-  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
-    locoStack[pos] = 0;                                     // clear loco stack
-    clearLocoData(pos);
-  }
-}
-
-
-void clearLocoData (uint16_t pos) {
-  uint16_t cnt;
-  locoData[pos].myAddr.address = 0;                         // clear loco data
-  locoData[pos].myName[0] = '\0';
-  locoData[pos].myFunc.Bits = 0;
-  locoData[pos].myDir = 0x80;
-  locoData[pos].mySpeed = 0;
-  locoData[pos].mySteps = DEFAULT_STEPS;
-  locoData[pos].myVmax = 100;
-  locoData[pos].myLocoID = SYS_NO_LOK;
-  locoData[pos].myFuncIcon[0] = FNC_LIGHT_OFF;
-  for (cnt = 1; cnt < 29; cnt++)
-    locoData[pos].myFuncIcon[cnt] = FNC_FUNC_OFF;
-  locoData[pos].myFuncIcon[cnt] = FNC_BLANK_OFF;
-}
-
-
-void getLastLoco() {
-  uint16_t loco;
-  loco = locoStack[0];                                      // get most recent loco in stack (filesystem)
-  loco = checkLocoAddress(loco);                            // avoid empty stack
-  findLocoData(loco);                                       // get pos in stack also check stack full
-  loadThrottleData();                                       // load data to throttle
-  updateSpeedHID();                                         // set encoder
-  setTimer(TMR_INFO, 10, TMR_ONESHOT);
-}
-
-void getNewLoco(uint16_t loco) {
-  if (useID) {
-    if (loco != locoData[myLocoData].myLocoID) {
-      releaseLoco();
-    }
-  }
-  else {
-    if (loco != locoData[myLocoData].myAddr.address) {
-      releaseLoco();
-    }
-  }
-  loco = checkLocoAddress(loco);
-  findLocoData(loco);                                       // get pos in stack also check stack full
-  loadThrottleData();                                       // load data to throttle
-  updateSpeedHID();                                         // set encoder
-  infoLocomotora(loco);                                     // ask current values
-  setTimer(TMR_INFO, 5, TMR_ONESHOT);
-}
-
-void findLocoData(uint16_t loco) {
-  uint16_t pos, cnt;
-  pos = 0;
-  if (useID) {
-    while (pos < LOCOS_IN_STACK) {                          // find ID loco data
-      if (locoData[pos].myLocoID == loco) {
-        myLocoData = pos;
-        pushLoco(loco);
-        DEBUG_MSG("Find ID%d data in %d", loco, pos);
-        return;
-      }
-      pos++;
-    }
-  }
-  else {
-    while (pos < LOCOS_IN_STACK) {                          // find address loco data
-      if (locoData[pos].myAddr.address == loco) {
-        myLocoData = pos;
-        pushLoco(loco);
-        DEBUG_MSG("Find %d data in %d", loco, pos);
-        return;
-      }
-      pos++;
-    }
-    DEBUG_MSG("New Loco")
-    pos = 0;                                                // new loco
-    while (pos < LOCOS_IN_STACK) {
-      if (locoData[pos].myAddr.address == 0) {
-        myLocoData = pos;
-        locoData[pos].myAddr.address = loco;
-        locoData[pos].myLocoID = SYS_ELOK;
-        //locoData[pos].mySteps = DEFAULT_STEPS;
-        pushLoco(loco);
-        return;
-      }
-      pos++;
-    }
-  }
-  myLocoData = 0;                                           // stack full
-  alertWindow(ERR_FULL);
-}
-
-
-void loadThrottleData() {
-  uint16_t n;
-  snprintf (locoName, NAME_LNG + 1, "%s", locoData[myLocoData].myName );
-  txtData[TXT_LOCO_NAME].font = (strlen(locoName) > 13) ? FSS7 : FSS9;
-  sprintf (locoAddr, "%d", locoData[myLocoData].myAddr.address);
-  lpicData[LPIC_MAIN].id = locoData[myLocoData].myLocoID;
-  iconData[ICON_FWD].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_NAVY : COLOR_DARKGREY;
-  iconData[ICON_REV].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_DARKGREY : COLOR_NAVY;
-  for (n = 0; n < 10; n++) {
-    fncData[FNC_FX0 + n].num = n;
-    fncData[FNC_FX0 + n].idIcon = locoData[myLocoData].myFuncIcon[n];
-  }
-  updateFuncState(false);
-}
-
-
-void updateFuncState(bool show) {
-  byte n;
-  bool state;
-  for (n = 0; n < 10; n++) {
-    state = bitRead(locoData[myLocoData].myFunc.Bits, fncData[FNC_FX0 + n].num);
-    if (fncData[FNC_FX0 + n].state != state) {
-      fncData[FNC_FX0 + n].state = state;
-      if (show)
-        newEvent(OBJ_FNC, FNC_FX0 + n, EVNT_DRAW);
-      DEBUG_MSG("Change in F%d", fncData[FNC_FX0 + n].num);
-    }
-  }
-}
-
-
-void toggleFunction(uint8_t fnc, uint8_t id) {
-  locoData[myLocoData].myFunc.Bits ^= bit(fnc);
-  fncData[id].state = bitRead(locoData[myLocoData].myFunc.Bits, fnc);
-  funcOperations(fnc);
-  newEvent(OBJ_FNC, id, EVNT_DRAW);
-}
-
-void showFuncBlock(uint8_t fncOffset) {
-  uint16_t ini, cnt;
-  for (ini = 0; ini < 10; ini++) {
-    cnt = ini + FNC_FX0;
-    fncData[cnt].idIcon = locoData[myLocoData].myFuncIcon[ini + fncOffset];
-    fncData[cnt].num = ini + fncOffset;
-    fncData[cnt].state = bitRead(locoData[myLocoData].myFunc.Bits, fncData[cnt].num);
-    drawObject(OBJ_FNC, cnt);
-  }
-}
-
-void showNextFuncBlock()  {
-  uint16_t ini, fncOffset;
-  ini = fncData[FNC_FX0].num;
-  fncOffset = (ini == 20) ? 0 : ini + 10;
-  showFuncBlock(fncOffset);
-}
-
-
-void updateSpeedHID() {
-  byte spd, steps;
-  switch (wifiSetting.protocol) {
-    case CLIENT_Z21:
-    case CLIENT_XNET:
-      if (bitRead(locoData[myLocoData].mySteps, 2)) {       // 0..127 -> 0..63
-        encoderMax = 63;
-        encoderValue = (locoData[myLocoData].mySpeed > 1) ? (locoData[myLocoData].mySpeed >> 1) : 0;
-      }
-      else {
-        if (bitRead(locoData[myLocoData].mySteps, 1)) {     // 0..31
-          encoderMax = 31;
-          spd = (locoData[myLocoData].mySpeed & 0x0F) << 1;
-          if (bitRead(locoData[myLocoData].mySpeed, 4))
-            bitSet(spd, 0);;
-          encoderValue = (spd > 3) ? spd : 0;
-        }
-        else {                                              // 0..15
-          encoderMax = 15;
-          spd = locoData[myLocoData].mySpeed & 0x0F;
-          encoderValue = (spd > 1) ? spd : 0;
-        }
-      }
-      break;
-    case CLIENT_LNET:
-      steps =   getMaxStepLnet();
-      encoderMax = (steps == 128) ? 63 : ((steps == 28) ? 31 : 15);
-      if (locoData[myLocoData].mySpeed > 1) {
-        if (steps == 128) {                                 // Max 100% speed (64 pasos, compatible con 14, 28 y 128 pasos)
-          encoderValue = locoData[myLocoData].mySpeed >> 1; // 0..127 -> 0..63
-        }
-        else {
-          if (steps == 28) {                                // 0..31
-            spd = (((locoData[myLocoData].mySpeed - 2) << 1) / 9);
-            encoderValue = spd + 4;
-          }
-          else {
-            spd = (locoData[myLocoData].mySpeed - 2) / 9;
-            encoderValue = spd + 2;
-          }
-        }
-      }
-      else
-        encoderValue = 0;
-      //DEBUG_MSG("HID Enc:%d Spd:%d", encoderValue, mySpeed);
-      break;
-    case CLIENT_ECOS:
-      encoderMax = 63;                                      // 0..127 -> 0..63
-      encoderValue = (locoData[myLocoData].mySpeed > 1) ? (locoData[myLocoData].mySpeed >> 1) : 0;
-      break;
-  }
-  updateSpeedDir();
-}
-
-
-void updateMySpeed() {
-  byte spd, steps;
-  switch (wifiSetting.protocol) {
-    case CLIENT_Z21:
-    case CLIENT_XNET:
-      if (bitRead(locoData[myLocoData].mySteps, 2)) {       // 0..63 -> 0..127
-        if ((encoderValue == 0) && shuntingMode)            // comprueba Modo maniobras
-          encoderValue = 1;
-        locoData[myLocoData].mySpeed = encoderValue << 1;
-      }
-      else {
-        if (bitRead(locoData[myLocoData].mySteps, 1)) {     // 0..31 -> 0..31     '---43210' -> '---04321'
-          encoderValue = shuntingSpeed (encoderValue, 4);
-          if (encoderValue > 3) {
-            locoData[myLocoData].mySpeed =  (encoderValue >> 1) & 0x0F;
-            bitWrite(locoData[myLocoData].mySpeed, 4, bitRead(encoderValue, 0));
-          }
-          else {
-            switch (encoderValue) {
-              case 0:
-              case 3:
-                locoData[myLocoData].mySpeed = 0;
-                encoderValue = 0;
-                break;
-              case 1:
-              case 2:
-                locoData[myLocoData].mySpeed = 2;
-                encoderValue = 4;
-                break;
-            }
-          }
-        }
-        else {
-          encoderValue = shuntingSpeed (encoderValue, 2);
-          locoData[myLocoData].mySpeed = (encoderValue > 1) ? encoderValue : 0;       // 0..15 -> 0..15
-        }
-      }
-      break;
-    case CLIENT_LNET:
-      steps =   getMaxStepLnet();
-      if (steps == 128) {
-        if ((encoderValue == 0) && shuntingMode)            // Modo maniobras
-          encoderValue = 1;
-        locoData[myLocoData].mySpeed = (encoderValue << 1); // 0..63 -> 0..127
-        if (encoderValue > 61)
-          locoData[myLocoData].mySpeed++;
-      }
-      else {
-        if (steps == 28) {
-          encoderValue = shuntingSpeed (encoderValue, 4);
-          if (encoderValue > 3) {
-            spd = ((encoderValue - 3) * 9) + 1;             // 0..31 -> 0..127
-            locoData[myLocoData].mySpeed =  (spd >> 1) + 1;
-          }
-          else {
-            switch (encoderValue) {
-              case 0:
-              case 3:
-                locoData[myLocoData].mySpeed = 0;
-                encoderValue = 0;
-                break;
-              case 1:
-              case 2:
-                locoData[myLocoData].mySpeed = 5;
-                encoderValue = 4;
-                break;
-            }
-          }
-        }
-        else {
-          encoderValue = shuntingSpeed (encoderValue, 2);
-          if (encoderValue == 1)
-            return;
-          locoData[myLocoData].mySpeed = (encoderValue > 1) ? ((encoderValue - 2) * 9) + 2 : 0;    // 0..15 -> 0..127
-        }
-      }
-      //DEBUG_MSG("LN  Enc:%d Spd:%d", encoderValue, mySpeed);
-      break;
-    case CLIENT_ECOS:
-      if ((encoderValue == 0) && shuntingMode)              // Modo maniobras
-        encoderValue = 1;
-      locoData[myLocoData].mySpeed = (encoderValue << 1);   // 0..63 -> 0..127
-      if (encoderValue > 61)
-        locoData[myLocoData].mySpeed++;
-      break;
-  }
-  locoOperationSpeed();
-}
-
-
-byte shuntingSpeed (byte encoder, byte stepMin) {           // comprueba Modo maniobras
-  if (encoder < stepMin) {
-    if (shuntingMode)
-      return stepMin;
-  }
-  return encoder;
-}
-
-
-void updateSpeedDir() {
-  uint16_t angle, spd, stp;
-  iconData[ICON_FWD].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_NAVY : COLOR_DARKGREY;
-  iconData[ICON_REV].color = (locoData[myLocoData].myDir & 0x80) ? COLOR_DARKGREY : COLOR_NAVY;
-  if (isWindow(WIN_THROTTLE)) {
-    angle = map(encoderValue, 0, encoderMax, 0, 255);
-    // if ((encoderMax == 15) && (encoderValue < 2))
-    //   angle = 0;
-    drawObject(OBJ_ICON, ICON_FWD);
-    drawObject(OBJ_ICON, ICON_REV);
-    spd = map(angle, 0, 255, 0, locoData[myLocoData].myVmax);
-    stp = getCurrentStep();
-    drawSpeed(angle, spd, stp);
-    DEBUG_MSG("Enc: %d-%d Spd: %d Stp: %d", encoderValue, encoderMax, spd, stp)
-  }
-  if (isWindow(WIN_SPEEDO)) {
-    gaugeData[GAUGE_SPEEDO].value = map(encoderValue, 0, encoderMax, 0, 255);
-    fncData[FNC_SPEEDO_DIR].idIcon = (locoData[myLocoData].myDir & 0x80) ? FNC_NEXT_OFF : FNC_PREV_OFF;
-    drawObject(OBJ_GAUGE, GAUGE_SPEEDO);
-    drawObject(OBJ_FNC, FNC_SPEEDO_DIR);
-    drawSpeedoStep();
-  }
-  if (isWindow(WIN_STA_PLAY)) {
-    gaugeData[GAUGE_STATION].value = map(encoderValue, 0, encoderMax, 0, 255);
-    fncData[FNC_STA_DIR].idIcon = (locoData[myLocoData].myDir & 0x80) ? FNC_NEXT_OFF : FNC_PREV_OFF;
-    drawObject(OBJ_GAUGE, GAUGE_STATION);
-    drawObject(OBJ_FNC, FNC_STA_DIR);
-  }
-}
-
-
-void drawSpeed(uint16_t angle, uint16_t spd, uint16_t stp) {
-  angle = (angle < 30) ? 330 + angle : angle - 30;          // convert 0..255 to drawing angles -30..225
-  tft.setPivot(gaugeData[GAUGE_SPEED].x, gaugeData[GAUGE_SPEED].y);
-  sprite.setColorDepth(8);                                  // Create an 8bpp Sprite
-  sprite.createSprite(36, 16);                              // 8bpp requires 36 * 16 = 576 bytes
-  sprite.setPivot(56, 7);                                   // Set pivot relative to top left corner of Sprite
-  sprite.fillSprite(COLOR_BACKGROUND);                      // Fill the Sprite with background
-  sprite.pushRotated(oldNeedle);                            // Delete needle
-  sprite.drawBitmap(0, 0, needle, 36, 15, COLOR_RED);       // Draw new needle
-  sprite.drawFastHLine(4, 7, 29, COLOR_PINK);
-  sprite.pushRotated(angle, COLOR_BACKGROUND);
-  oldNeedle = angle;
-  sprite.fillSprite(gaugeData[GAUGE_SPEED].color);          // Fill the Sprite with black //gaugeData[GAUGE_SPEED].color
-  sprite.setFreeFont(FSSB9);
-  sprite.setTextColor(COLOR_WHITE);
-  sprite.setTextDatum(MC_DATUM);
-  sprite.drawNumber(spd, 18, 8);                            // Draw current speed in km/h
-  sprite.pushSprite(gaugeData[GAUGE_SPEED].x - 18, gaugeData[GAUGE_SPEED].y - 8, COLOR_TRANSPARENT);
-  sprite.fillSprite(COLOR_BACKGROUND);                      // Draw current step
-  sprite.setFreeFont(FSS7);
-  sprite.drawNumber(stp, 18, 8);
-  sprite.pushSprite(gaugeData[GAUGE_SPEED].x - 18, gaugeData[GAUGE_SPEED].y + 44, COLOR_TRANSPARENT);
-  sprite.deleteSprite();
-}
-
-
-void drawSpeedoStep() {
-  uint16_t stp;
-  stp = getCurrentStep();
-  sprite.setColorDepth(16);                                 // Create an 16bpp Sprite
-  sprite.createSprite(36, 16);                              // 8bpp requires 36 * 16 = 576 bytes * 2
-  sprite.fillSprite(COLOR_BACKGROUND);                      // Draw current step
-  sprite.setFreeFont(FSS7);
-  sprite.setTextColor(COLOR_WHITE);
-  sprite.setTextDatum(MC_DATUM);
-  sprite.drawNumber(stp, 18, 8);
-  sprite.pushSprite(gaugeData[GAUGE_SPEEDO].x - 18, gaugeData[GAUGE_SPEEDO].y + 20, COLOR_TRANSPARENT);
-  sprite.deleteSprite();
-}
-
-
-uint16_t countLocoInStack() {
-  uint16_t pos, total;
-  total = 0;
-  pos = 0;
-  while ((locoStack[pos++] > 0) && (pos < LOCOS_IN_STACK))
-    total++;
-  return total;
-}
-
-
-void prepareLocoList() {
-  uint16_t pos;
-  for (pos = 0; pos < 6; pos++) {                           // delete list
-    txtData[TXT_SEL_ADDR1 + pos].buf[0] = '\0';
-    txtData[TXT_SEL_NAME1 + pos].buf[0] = '\0';
-  }
-  encoderValue = 0;                                         // count locos in stack
-  encoderMax = countLocoInStack();
-  DEBUG_MSG("Locos in list: %d", encoderMax);
-  if (encoderMax > 0)
-    encoderMax--;
-  sortLocoList(SORT_LAST);
-  populateLocoList();
-}
-
-
-void populateLocoList() {
-  uint16_t posName;
-  uint16_t line, adr, n;
-  for (n = 0; n < 6; n++) {
-    if (n < encoderMax + 1) {
-      line = (encoderValue > 5) ? encoderValue - 5 : 0;
-      adr = sortedLocoStack[line + n];
-      posName = findLocoPos(adr);
-      //DEBUG_MSG("Enc: %d Line: %d Adr: %d", encoderValue, line, adr);
-      if (useID)
-        snprintf(txtData[TXT_SEL_ADDR1 + n].buf, ADDR_LNG + 1, "%d", locoData[posName].myAddr.address);
-      else
-        snprintf(txtData[TXT_SEL_ADDR1 + n].buf, ADDR_LNG + 1, "%d", adr);
-      if (posName != LOCOS_IN_STACK)
-        snprintf(txtData[TXT_SEL_NAME1 + n].buf, NAME_LNG + 1, locoData[posName].myName);
-    }
-  }
-  line = (encoderValue > 5) ? 5 : encoderValue;
-  for (n = 0; n < 6; n++) {
-    txtData[TXT_SEL_ADDR1 + n].backgnd = (n == line) ? COLOR_YELLOW : COLOR_WHITE;
-    txtData[TXT_SEL_NAME1 + n].backgnd = (n == line) ? COLOR_YELLOW : COLOR_WHITE;
-  }
-}
-
-
-uint16_t findLocoPos(uint16_t loco) {
-  uint16_t pos, n;
-  pos = LOCOS_IN_STACK;
-  for (n = 0; n < LOCOS_IN_STACK; n++) {
-    if (useID) {
-      if (locoData[n].myLocoID  == loco)                    // search ID in loco stack
-        pos = n;
-    }
-    else {
-      if (locoData[n].myAddr.address  == loco)              // search address in loco stack
-        pos = n;
-    }
-  }
-  return pos;
-}
-
-
-void sortLocoList (uint16_t order) {
-  uint16_t tmp, n, i, j, total, pos;
-  bool reverse;
-#ifdef DEBUG
-  Serial.print(F("INI.STACK: "));
-  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
-    Serial.print(sortedLocoStack[pos]);
-    Serial.print(' ');
-  }
-  Serial.println();
-#endif
-  objStack[posObjStack1].objID = ICON_LAST_UP + order;
-  currOrder = order;
-  total = countLocoInStack();
-  reverse = false;
-  //DEBUG_MSG("Order %d Total %d", currOrder, total)
-  switch (order) {
-    case SORT_LAST:
-      for (n = 0; n < LOCOS_IN_STACK; n++)
-        sortedLocoStack[n] = locoStack[n];
-      break;
-    case SORT_NUM_DWN:
-      reverse = true;
-    case SORT_NUM_UP:
-      for (i = 1; i < total; i++) {
-        if (useID) {
-          for (j = i; j > 0 && (idOrder(sortedLocoStack[j - 1], sortedLocoStack[j]) != reverse); j--) {
-            tmp = sortedLocoStack[j - 1];
-            sortedLocoStack[j - 1] = sortedLocoStack[j];
-            sortedLocoStack[j] = tmp;
-          }
-        }
-        else {
-          for (j = i; j > 0 && ((sortedLocoStack[j - 1] > sortedLocoStack[j]) != reverse); j--) {
-            tmp = sortedLocoStack[j - 1];
-            sortedLocoStack[j - 1] = sortedLocoStack[j];
-            sortedLocoStack[j] = tmp;
-          }
-        }
-      }
-      break;
-    case SORT_NAME_DWN:
-      reverse = true;
-    case SORT_NAME_UP:
-      for (i = 1; i < total; i++) {
-        for (j = i; j > 0 && (nameOrder(sortedLocoStack[j - 1], sortedLocoStack[j]) != reverse); j--) {
-          tmp = sortedLocoStack[j - 1];
-          sortedLocoStack[j - 1] = sortedLocoStack[j];
-          sortedLocoStack[j] = tmp;
-        }
-      }
-      break;
-  }
-#ifdef DEBUG
-  Serial.print(F("END.STACK: "));
-  for (pos = 0; pos < LOCOS_IN_STACK; pos++) {
-    Serial.print(sortedLocoStack[pos]);
-    Serial.print(' ');
-  }
-  Serial.println();
-#endif
-}
-
-
-bool nameOrder(uint16_t first, uint16_t second) {
-  uint16_t posFirst, posSecond;
-  posFirst = findLocoPos(first);
-  posSecond = findLocoPos(second);
-  return strcmp(locoData[posFirst].myName, locoData[posSecond].myName) > 0;
-}
-
-
-bool idOrder(uint16_t first, uint16_t second) {
-  uint16_t posFirst, posSecond;
-  posFirst = findLocoPos(first);
-  posSecond = findLocoPos(second);
-  return (locoData[posFirst].myAddr.address > locoData[posSecond].myAddr.address);
-}
 
 
 ////////////////////////////////////////////////////////////

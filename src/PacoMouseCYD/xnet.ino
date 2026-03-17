@@ -19,6 +19,9 @@ void showErrorXnet() {                                      // muestra pantalla 
   if (csStatus & csEmergencyOff) {
     iconData[ICON_POWER].color = COLOR_RED;
     setTimer (TMR_POWER, 5, TMR_PERIODIC);                  // Flash power icon
+    setColorRGB(LED_RGB_RED);
+    if ((isWindow(WIN_ALERT)) && (errType == ERR_STOP))
+      closeWindow(WIN_ALERT);
     if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
       newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
     if (isWindow(WIN_STA_PLAY)) {
@@ -26,19 +29,24 @@ void showErrorXnet() {                                      // muestra pantalla 
       newEvent(OBJ_FNC, FNC_STA_RAYO, EVNT_DRAW);
     }
   }
+  else {
+    if (csStatus & csEmergencyStop) {
+      setColorRGB(LED_RGB_BLUE);
+      if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
+        alertWindow(ERR_STOP);
+    }
+  }
   if (csStatus & csServiceMode) {
+    setColorRGB(LED_RGB_BLUE);
     if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
       alertWindow(ERR_SERV);
-  }
-  if (csStatus & csEmergencyStop) {
-    if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
-      alertWindow(ERR_STOP);
   }
 }
 
 void showNormalOpsXnet() {
   stopTimer (TMR_POWER);
   iconData[ICON_POWER].color = COLOR_GREEN;
+  setColorRGB(LED_RGB_GREEN);
   if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
     newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
   if (isWindow(WIN_STA_PLAY)) {
@@ -99,7 +107,7 @@ void getResultsXnet() {
   headerXN (0x21);                                          // Request for Service Mode results       (0x21,0x10,0x31)
   dataXN (0x10);
   sendXN();
-  //getResultsSM = false;
+  setColorRGB(LED_RGB_BLUE);
 }
 
 
@@ -609,39 +617,26 @@ void procesaXN () {
       break;
     default:
       if ((rxBufferXN[HEADER] & 0xF0) == 0x40) {            // Feedback broadcast / Accessory decoder information response (0x4X,MOD,DATA,...,XOR)
-        /*
-          for (n = HEADER; n < (rxBytes - 2); n += 2) {
+        for (n = HEADER; n < (rxBytes - 2); n += 2) {
           modulo = rxBufferXN[n + 1];
           dato = rxBufferXN[n + 2];
-          if (modulo == miModulo) {                         // Si es mi desvio guarda su posicion
-            if (bitRead(dato, 4) == bitRead(miAccPos, 1)) {
-              if (bitRead(miAccPos, 0))
-                myPosTurnout = (dato >> 2) & 0x03;
-              else
-                myPosTurnout = dato & 0x03;
-              if (scrOLED == SCR_TURNOUT)
-                updateOLED = true;
-            }
+          if ((dato & 0x60) != 0x40) {                      // Accessory feedback
+            adr = (modulo << 2) + 1;
+            if (bitRead(dato, 4))
+              adr = adr + 2;
+            if ((dato & 0x03) == 0x01)
+              accessoryChange(adr, false);
+            if ((dato & 0x03) == 0x02)
+              accessoryChange(adr, true);
+            if ((dato & 0x0C) == 0x04)
+              accessoryChange(adr + 1, false);
+            if ((dato & 0x0C) == 0x08)
+              accessoryChange(adr + 1, true);
           }
-          #ifdef USE_AUTOMATION
-          for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
-            if ((automation[n].opcode & OPC_AUTO_MASK) == OPC_AUTO_FBK) {
-              if (modulo == automation[n].param) {
-                unsigned int nibble = (dato & 0x10) ? 0x0F : 0xF0;
-                automation[n].value &= nibble;
-                nibble = (dato & 0x10) ? (dato << 4) : (dato & 0x0F);
-                automation[n].value |= nibble;
-              }
-            }
+          else {                                            // RS Feedback
+
           }
-          #endif
-          modulo++;
-          if (modulo == Shuttle.moduleA)                    // shuttle contacts
-            updateShuttleStatus(&Shuttle.statusA, dato);
-          if (modulo == Shuttle.moduleB)
-            updateShuttleStatus(&Shuttle.statusB, dato);
-          }
-        */
+        }
       }
       break;
   }

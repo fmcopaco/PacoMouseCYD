@@ -375,10 +375,43 @@ bool loadAccPanelNames(fs::FS & fs) {
 }
 
 
+void updateFirmware() {
+  File firmware =  SD.open("/PacoMouseCYD.ino.esp32.bin");
+  if (firmware) {
+    drawWindow(WIN_ABOUT);
+    barData[BAR_UPDATE].value = 0;
+    drawObject(OBJ_BAR, BAR_UPDATE);
+    Update.onProgress(progressCallBack);
+    Update.begin(firmware.size(), U_FLASH);
+    Update.writeStream(firmware);
+    if (Update.end()) {
+      DEBUG_MSG("Update done!")
+      barData[BAR_UPDATE].colorOn = COLOR_GREEN;
+    }
+    else {
+      DEBUG_MSG("Update Error")
+      barData[BAR_UPDATE].colorOn = COLOR_RED;
+    }
+    drawObject(OBJ_BAR, BAR_UPDATE);
+    tft.drawBitmap(barData[BAR_UPDATE].x + 84, barData[BAR_UPDATE].y + 4, screen, 32, 32, COLOR_YELLOW); // monochrome
+    firmware.close();
+    delay(2000);
+    ESP.restart();
+  }
+  else {
+    alertWindow(ERR_FILE);
+  }
+}
 
 
-
-
+void progressCallBack(size_t currSize, size_t totalSize) {                              // Update progress status
+  uint16_t done;
+  done = (uint16_t)((currSize * 100) / totalSize);
+  barData[BAR_UPDATE].value = done;
+  drawObject(OBJ_BAR, BAR_UPDATE);
+  DEBUG_MSG("CALLBACK:  Update process at %d of %d bytes...n", currSize, totalSize);
+  DEBUG_MSG("%d updated", done)
+}
 
 
 

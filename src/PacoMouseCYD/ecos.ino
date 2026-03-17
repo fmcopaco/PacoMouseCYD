@@ -143,6 +143,7 @@ void showTrkECoS() {
   if (csStatus > 0) {
     stopTimer (TMR_POWER);
     iconData[ICON_POWER].color = COLOR_GREEN;
+    setColorRGB(LED_RGB_GREEN);
     if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
       newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
     if (isWindow(WIN_STA_PLAY)) {
@@ -162,6 +163,7 @@ void showTrkECoS() {
   else {
     iconData[ICON_POWER].color = COLOR_RED;                       // Power off
     setTimer (TMR_POWER, 5, TMR_PERIODIC);                        // Flash power icon
+    setColorRGB(LED_RGB_RED);
     if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
       newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
     if (isWindow(WIN_STA_PLAY)) {
@@ -766,14 +768,6 @@ void decodeEventECoS () {
           DEBUG_MSG("Version: %d", appVer)
         }
         break;
-        /*
-          case T_CS1:                                                         // 1 CentralStation
-          case T_ECOS:                                                        // 1 ECoS
-          case T_ECOS2:                                                       // 1 ECoS2
-          typeCmdStation = T.token;
-          DEBUG_MSG("CS Type: %s", tokstr[typeCmdStation]);
-          break;
-        */
     }
     discardLine();
   }

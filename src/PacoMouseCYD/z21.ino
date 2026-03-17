@@ -75,6 +75,9 @@ void showErrorZ21() {                                        // muestra pantalla
   if (csStatus & csTrackVoltageOff) {
     iconData[ICON_POWER].color = COLOR_RED;
     setTimer (TMR_POWER, 5, TMR_PERIODIC);                   // Flash power icon
+    setColorRGB(LED_RGB_RED);
+    if ((isWindow(WIN_ALERT)) && (errType == ERR_STOP))
+      closeWindow(WIN_ALERT);
     if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
       newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
     if (isWindow(WIN_STA_PLAY)) {
@@ -82,13 +85,17 @@ void showErrorZ21() {                                        // muestra pantalla
       newEvent(OBJ_FNC, FNC_STA_RAYO, EVNT_DRAW);
     }
   }
+  else {
+    if (csStatus & csEmergencyStop) {
+      setColorRGB(LED_RGB_BLUE);
+      if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
+        alertWindow(ERR_STOP);
+    }
+  }
   if (csStatus & csProgrammingModeActive) {
+    setColorRGB(LED_RGB_BLUE);
     if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
       alertWindow(ERR_SERV);
-  }
-  if (csStatus & csEmergencyStop) {
-    if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
-      alertWindow(ERR_STOP);
   }
 }
 
@@ -96,6 +103,7 @@ void showErrorZ21() {                                        // muestra pantalla
 void showNormalOpsZ21() {
   stopTimer (TMR_POWER);
   iconData[ICON_POWER].color = COLOR_GREEN;
+  setColorRGB(LED_RGB_GREEN);
   if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
     newEvent(OBJ_ICON, ICON_POWER, EVNT_DRAW);
   if (isWindow(WIN_STA_PLAY)) {
@@ -164,11 +172,6 @@ void processZ21() {
       if (!(csStatus & csProgrammingModeActive))
         getStatusZ21();
     }
-    /*
-      battery = ESP.getVcc ();                                  // Read VCC voltage
-      if (battery < LowBattADC)
-      lowBATT = true;
-    */
   }
   if (progFinished) {                                         // fin de lectura/programacion CV
     progFinished = false;
@@ -341,7 +344,7 @@ void getFeedbackInfo (byte group) {
 
 void ReceiveZ21 (int len, byte * packet) {                    // get UDP packet, maybe more than one!!
   int  DataLen, isPacket;
-#ifdef DEBUG____X
+#ifdef DEBUG
   Serial.print("\nRX Length: ");
   Serial.println (len);
   for (int i = 0; i < len; i++) {
@@ -370,6 +373,7 @@ void DecodeZ21 (int len, byte * packet) {                     // decode z21 UDP 
   int Header, DataLen;
   unsigned int FAdr;
   byte group;
+  bool state;
 
   Header = (packet[DATA_HEADERH] << 8) + packet[DATA_HEADERL];
   switch (Header) {
@@ -387,18 +391,6 @@ void DecodeZ21 (int len, byte * packet) {                     // decode z21 UDP 
       break;
     case LAN_RMBUS_DATACHANGED:
       /*
-        if (Shuttle.moduleA > 0) {                              // only check shuttle contacts
-          if ((packet[4] == 0x01) && (Shuttle.moduleA > 10))
-            Shuttle.statusA = packet[Shuttle.moduleA - 6];
-          if ((packet[4] == 0x00) && (Shuttle.moduleA < 11))
-            Shuttle.statusA = packet[Shuttle.moduleA + 4];
-        }
-        if (Shuttle.moduleB > 0) {
-          if ((packet[4] == 0x01) && (Shuttle.moduleB > 10))
-            Shuttle.statusB = packet[Shuttle.moduleB - 6];
-          if ((packet[4] == 0x00) && (Shuttle.moduleB < 11))
-            Shuttle.statusB = packet[Shuttle.moduleB + 4];
-        }
         #ifdef USE_AUTOMATION
         for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
           if ((automation[n].opcode & OPC_AUTO_MASK) == OPC_AUTO_FBK) {
@@ -453,13 +445,8 @@ void DecodeZ21 (int len, byte * packet) {                     // decode z21 UDP 
       switch (packet[XHEADER]) {
         case 0x43:                                            // LAN_X_TURNOUT_INFO
           FAdr = (packet[DB0] << 8) + packet[DB1] + 1;
-          /*
-            if (FAdr == myTurnout) {
-            myPosTurnout = packet[DB2] & 0x03;
-              if (scrOLED == SCR_TURNOUT)
-              updateOLED = true;
-            }
-          */
+          state = ((packet[DB2] & 0x03) == 0x02) ? true : false;
+          accessoryChange(FAdr, state);
           break;
         case 0x61:
           switch (packet[DB0]) {
@@ -570,7 +557,7 @@ void sendUDP (int len) {
   Udp.write(OutData, len);
   Udp.endPacket();
   delay(0);
-#ifdef DEBUG___X
+#ifdef DEBUG
   Serial.print("TX: ");
   for (int i = 0; i < len; i++) {
     Serial.print(OutData[i], HEX);

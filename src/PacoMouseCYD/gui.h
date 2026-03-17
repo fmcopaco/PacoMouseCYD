@@ -51,6 +51,7 @@ ERROR_Please_enable_LOAD_GFXFF_in_User_Setup!
 #define COLOR_SKYBLUE         0x867D
 #define COLOR_RED             0xF882
 #define COLOR_DARKRED         0x8800
+#define COLOR_CANDY_RED       0xF840
 #define COLOR_PINK            0xF97F
 #define COLOR_MAGENTA         0xF81F
 #define COLOR_GREEN           0x0780
@@ -90,7 +91,7 @@ const uint16_t colorDraw[] = {COLOR_BLACK, COLOR_BLUE, COLOR_RED, COLOR_MAGENTA,
 ////////////////////////////////////////////////////////////
 
 enum objTypeGUI {OBJ_UNDEF, OBJ_TIMER, OBJ_WIN, OBJ_BUTTON, OBJ_LABEL, OBJ_TXT, OBJ_BAR, OBJ_DRAWSTR, OBJ_ICON, OBJ_KEYBOARD, OBJ_SWITCH,
-                 OBJ_GAUGE, OBJ_LPIC, OBJ_FNC, OBJ_SLIDER, OBJ_RADIO, OBJ_CHAR,
+                 OBJ_GAUGE, OBJ_LPIC, OBJ_FNC, OBJ_SLIDER, OBJ_RADIO, OBJ_CHAR, OBJ_DATA,
                 };
 
 struct wObj {                                           // Graphic objects
@@ -107,7 +108,7 @@ uint16_t lastWinStack;
 // ***** EVENT *****
 ////////////////////////////////////////////////////////////
 
-enum EventGUI {EVNT_CLICK, EVNT_DRAW, EVNT_WOPEN, EVNT_WCLOSE, EVNT_TIMER, EVNT_BOOT};
+enum EventGUI {EVNT_CLICK, EVNT_DRAW, EVNT_WOPEN, EVNT_WCLOSE, EVNT_TIMER, EVNT_PRESS};
 
 typedef struct {                                        // Events
   uint16_t  objType;

@@ -10,7 +10,7 @@ void initPins() {
   digitalWrite(TFT_CS, HIGH);                                     // TFT screen chip select
   digitalWrite(SD_CS,  HIGH);                                     // SD card chips select
   digitalWrite(XPT2046_CS, HIGH);                                 // Touch screen chips select
-  pinMode (SW_BOOT,    INPUT);                                    // Button BOOT
+  pinMode (SW_BOOT_PIN, INPUT);                                   // Button BOOT
   pinMode (ENCODER_A,  INPUT);                                    // Encoder
   pinMode (ENCODER_B,  INPUT);
   pinMode (ENCODER_SW, INPUT);
@@ -18,7 +18,12 @@ void initPins() {
   pinMode(RGB_LED_R, OUTPUT);                                     // RGB LED
   pinMode(RGB_LED_G, OUTPUT);
   pinMode(RGB_LED_B, OUTPUT);
-  setColorRGB(0);                                                 // turn off RGB LED
+  setColorRGB(LED_RGB_OFF);                                       // turn off RGB LED
+#endif
+#if (USE_RGB_LED == FUNC_BUTTONS)
+  pinMode(RGB_LED_R, INPUT);                                      // RGB LED removed, used as programable pushbuttons
+  pinMode(RGB_LED_G, INPUT);
+  pinMode(RGB_LED_B, INPUT);
 #endif
 }
 
@@ -45,9 +50,12 @@ void aliveAndKicking() {
     setBacklight(backlight);
 }
 
+
+void setColorRGB (uint16_t color) {                               // set color of RGB LED ('xxxxxGRB')
 #if (USE_RGB_LED == PRESENT)
-void setColorRGB (uint16_t color) {                               // set color of RGB LED
   int state;
+  if (activeRGB == 0)
+    color = 0;
   state = (color & 0x04) ? LOW : HIGH;
   digitalWrite(RGB_LED_G, state);
   state = (color & 0x02) ? LOW : HIGH;
@@ -55,8 +63,9 @@ void setColorRGB (uint16_t color) {                               // set color o
   state = (color & 0x01) ? LOW : HIGH;
   digitalWrite(RGB_LED_B, state);
   DEBUG_MSG("Color: %d", color & 0x07)
-}
 #endif
+}
+
 
 initResult initSequence() {                                       // Performs init sequence
   char label[MAX_LABEL_LNG];
@@ -71,7 +80,7 @@ initResult initSequence() {                                       // Performs in
     if (tft.width() == 240)
       drawBmp (FileName, 0, 180);
     else
-      drawBmp (FileName, 40, 260);
+      drawBmp (FileName, 0, 200);
     loadLocoFiles(SD, "/loco");                                   // load loco data & panel names from SD file
     loadAccPanelNames(SD);
   }
@@ -203,6 +212,13 @@ bool notLockedOption (byte opt) {                                 // check if op
 // ***** TOUCHSCREEN *****
 ////////////////////////////////////////////////////////////
 
+void startCalibration() {
+  if (! calibrationPending) {
+    calibrationPending = true;
+    newEvent(OBJ_WIN, WIN_CALIBRATE, EVNT_WOPEN);
+  }
+}
+
 void calibrateTouchscreen(uint16_t colorIn, uint16_t colorOut, uint16_t bg) {
   uint16_t TS_TOP, TS_BOT, TS_LEFT, TS_RT;
   uint16_t x, y, z;
@@ -277,9 +293,9 @@ void showClockData(uint16_t txtFocus) {
 void scanWiFi() {
   networks = 0;
   while (networks == 0) {
-    WiFi.disconnect(true); //DISCONNECT WITH TRUE (SHUOLD TURN OFF THE RADIO)
+    WiFi.disconnect(true);                                        //DISCONNECT WITH TRUE (SHUOLD TURN OFF THE RADIO)
     delay(1000);
-    WiFi.mode(WIFI_STA); //CALLING THE WIFI MODE AS STATION
+    WiFi.mode(WIFI_STA);                                          //CALLING THE WIFI MODE AS STATION
     WiFi.scanDelete();
     networks = WiFi.scanNetworks();
     DEBUG_MSG("Networks: %d", networks);
@@ -317,6 +333,10 @@ void wifiAnalyzer() {
     ap_count[n] = 0;
     max_rssi[n] = RSSI_FLOOR;
   }
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);                                        //DISCONNECT WITH TRUE (SHUOLD TURN OFF THE RADIO)
+  delay(500);
+  WiFi.scanDelete();
   n = WiFi.scanNetworks();
   drawObject(OBJ_DRAWSTR, DSTR_WIFI_SCAN);
   drawObject(OBJ_LABEL, LBL_SSID_SCAN);
@@ -548,6 +568,8 @@ void releaseLoco() {
 
 
 void sendAccessory(unsigned int FAdr, int pair, bool activate) {
+  if (activate)
+    (pair > 0) ? bitSet(accPosition[FAdr >> 3], FAdr & 0x0007) : bitClear(accPosition[FAdr >> 3], FAdr & 0x0007);
   switch (wifiSetting.protocol) {
     case CLIENT_Z21:
       setAccessoryZ21(FAdr, pair, activate);
@@ -565,7 +587,18 @@ void sendAccessory(unsigned int FAdr, int pair, bool activate) {
 }
 
 
+void accessoryChange(uint16_t FAdr, bool state) {
+  bitWrite(accPosition[FAdr >> 3], FAdr & 0x0007, state);
+  DEBUG_MSG("Acc change: %d:%d", FAdr, state);
+  if (isWindow(WIN_ACCESSORY))
+    changeAccPosition(FAdr, state);
+
+
+}
+
+
 void resumeOperations() {
+  setColorRGB(LED_RGB_GREEN);
   switch (wifiSetting.protocol) {
     case CLIENT_Z21:
       resumeOperationsZ21();
@@ -584,6 +617,7 @@ void resumeOperations() {
 
 
 void emergencyOff() {
+  setColorRGB(LED_RGB_RED);
   switch (wifiSetting.protocol) {
     case CLIENT_Z21:
       emergencyOffZ21();
@@ -662,6 +696,7 @@ void setTime(byte hh, byte mm, byte rate) {
 
 
 void readCV (unsigned int adr, byte stepPrg) {
+  setColorRGB(LED_RGB_BLUE);
   switch (wifiSetting.protocol) {
     case CLIENT_Z21:
       readCVZ21(adr, stepPrg);
@@ -680,6 +715,7 @@ void readCV (unsigned int adr, byte stepPrg) {
 
 
 void writeCV (unsigned int adr, unsigned int data, byte stepPrg) {
+  setColorRGB(LED_RGB_BLUE);
   switch (wifiSetting.protocol) {
     case CLIENT_Z21:
       writeCVZ21(adr, data, stepPrg);
@@ -720,6 +756,10 @@ void exitProgramming() {
 
 void endProg() {                                                  // Fin de programcion/lectura CV
   DEBUG_MSG("END PROG: CVData - % d Step: % d", CVdata, progStepCV);
+  if (isTrackOff())
+    setColorRGB(LED_RGB_RED);
+  else
+    setColorRGB(LED_RGB_GREEN);
   if (CVdata > 255) {
     if (progStepCV == PRG_RD_CV29)                                // Si buscaba direccion, muestra CV1 en lugar de CV29
       CVaddress = 1;
@@ -839,4 +879,21 @@ void saveCalibrationValues() {
   EEPROM.write (EE_YMAX_H, highByte(cal.yMax));
   EEPROM.write (EE_YMAX_L, lowByte(cal.yMax));
   EEPROM.commit();
+}
+
+void updateWiFiSettings() {
+  uint16_t pos;
+  pos = EE_WIFI + (EEPROM.read(EE_WIFI_NET) * sizeof(wifiSetting));
+  EEPROM.put(pos, wifiSetting);
+  eepromChanged = true;
+}
+
+
+void saveWiFiChanges() {
+  if (eepromChanged) {
+    EEPROM.commit();
+    eepromChanged = false;
+    alertWindow(ERR_CHG_WIFI);
+    DEBUG_MSG("Saving WiFi changes in EEPROM")
+  }
 }

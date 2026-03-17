@@ -9,8 +9,9 @@
 #define CYD_TFT_32        2                                       // Cheap Yellow Display 3.2"
 #define CYD_USER_DEFINED  3                                       // User defined board
 
-#define PRESENT           1
 #define UNUSED            0
+#define PRESENT           1
+#define FUNC_BUTTONS      2
 
 #define MODE_SPI          0
 #define MODE_BITBANG      1
@@ -52,7 +53,7 @@
 #define XPT2046_CLK   14    // T_CLK
 #define XPT2046_CS    33    // T_CS
 
-// Seleccione si usa el LED RGB - Select if use the RGB LED: PRESENT / UNUSED
+// Seleccione si usa el LED RGB - Select if use the RGB LED: PRESENT / UNUSED / FUNC_BUTTONS
 #define USE_RGB_LED   PRESENT 
 
 //RGB LED Pins

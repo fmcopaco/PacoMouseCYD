@@ -719,7 +719,7 @@ void drawObject (uint16_t type, uint16_t id) {
         tft.drawCircle(gaugeData[id].x, gaugeData[id].y, 75, COLOR_GOLD);
         tft.fillCircle(gaugeData[id].x, gaugeData[id].y, 20, gaugeData[id].color);
         delay(0);
-        updateSpeedDir();                               // draw needle & dir
+        drawGaugeNeedle(id);                            // draw needle & dir
         delay(0);
       }
       break;
@@ -752,6 +752,23 @@ void drawObject (uint16_t type, uint16_t id) {
 
   }
   delay(0);
+}
+
+
+void drawGaugeNeedle(uint16_t id) {                         // Draw gauge speed needle
+  uint16_t angle;
+  angle = (gaugeData[id].value < 30) ? 330 + gaugeData[id].value : gaugeData[id].value - 30;          // convert 0..255 to drawing angles -30..225
+  tft.setPivot(gaugeData[id].x, gaugeData[id].y);
+  sprite.setColorDepth(8);                                  // Create an 8bpp Sprite
+  sprite.createSprite(36, 16);                              // 8bpp requires 36 * 16 = 576 bytes
+  sprite.setPivot(56, 7);                                   // Set pivot relative to top left corner of Sprite
+  sprite.fillSprite(COLOR_BACKGROUND);                      // Fill the Sprite with background
+  sprite.pushRotated(gaugeData[id].oldValue);               // Delete needle
+  sprite.drawBitmap(0, 0, needle, 36, 15, COLOR_RED);       // Draw new needle
+  sprite.drawFastHLine(4, 7, 29, COLOR_PINK);
+  sprite.pushRotated(angle, COLOR_BACKGROUND);
+  gaugeData[id].oldValue = angle;
+  sprite.deleteSprite();
 }
 
 
@@ -951,7 +968,36 @@ void getLabelTxt(uint16_t id, char *buf) {
     buf[cnt++] = chr;
     chr = *language++;
   }
-  buf[cnt] = '\0';;
+  buf[cnt] = '\0';
+}
+
+
+void getLabelOption(uint16_t id, char *buf, uint8_t opt) {
+  uint16_t cnt;
+  char chr;
+  const char *language;
+  language = translations[id][currLanguage];
+  if (language == NULL)
+    language = translations[id][LANG_ENGLISH];
+  cnt = 0;
+  buf[cnt] = '\0';
+  chr = *language++;
+  while (chr) {
+    if (chr == '\n') {
+      chr = '\0';
+      buf[cnt] = chr;
+      if (opt > 0) {
+        opt--;
+        cnt = 0;
+        chr = *language++;
+      }
+    }
+    else {
+      buf[cnt++] = chr;
+      chr = *language++;
+    }
+  }
+  buf[cnt] = '\0';
 }
 
 

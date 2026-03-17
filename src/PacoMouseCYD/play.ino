@@ -11,10 +11,12 @@ void updateStationTime (uint16_t seconds) {
 }
 
 void updateStationTarget() {
+  uint16_t delta;
   staStations = staLevel + 4;
   if (staStartTime < 10)
     staStartTime = 10;
-  staTime = staStartTime + ((staLevel - 1) * 10);
+  delta = staStartTime / 5;                       // time for one station
+  staTime = staStartTime + ((staLevel - 1) * delta);
 }
 
 void newStationCounters (bool ini) {
@@ -102,3 +104,7 @@ void updateTurnoutButtons() {
     fncData[FNC_STA_ACC0 + n].colorOn = staTurnoutPos[n] ? COLOR_RED : COLOR_GREEN;
   }
 }
+
+////////////////////////////////////////////////////////////
+// ***** NEXT TRAIN - MODEL TRAIN GAME FOR ADULTS *****
+////////////////////////////////////////////////////////////

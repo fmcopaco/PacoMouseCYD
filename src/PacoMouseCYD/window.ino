@@ -42,7 +42,8 @@ void openWindow(uint16_t id) {
       newEvent(OBJ_WIN, WIN_SSID, EVNT_DRAW);
       break;
     case WIN_WIFI:
-      snprintf(ssidName, SSID_LNG, "%s", wifiSetting.ssid);
+      snprintf(networkNameBuf, NAME_LNG + 1, "%s", wifiSetting.network);
+      snprintf(ssidName, SSID_LNG + 1, "%s", wifiSetting.ssid);
       snprintf(keybPwdHideBuf, 9, "********");
       snprintf(keybIP1Buf, 4, "%d", wifiSetting.CS_IP[0]);
       snprintf(keybIP2Buf, 4, "%d", wifiSetting.CS_IP[1]);
@@ -52,6 +53,7 @@ void openWindow(uint16_t id) {
       createObject(OBJ_WIN, WIN_WIFI);
       createObject(OBJ_ICON, ICON_WIFI_CFG);
       createObject(OBJ_LABEL, LBL_SSID);
+      createObject(OBJ_TXT, TXT_NETWORK);
       createObject(OBJ_TXT, TXT_SSID);
       createObject(OBJ_LABEL, LBL_PWD_HIDE);
       createObject(OBJ_TXT, TXT_PWD_HIDE);
@@ -69,13 +71,38 @@ void openWindow(uint16_t id) {
       newEvent(OBJ_WIN, WIN_WIFI, EVNT_DRAW);
       break;
     case WIN_WIFI_PWD:
-      snprintf(keybPwdBuf, PWD_LNG, wifiSetting.password);
+      txtData[TXT_PWD].maxLength = PWD_LNG;
+      snprintf(keybPwdBuf, PWD_LNG + 1, wifiSetting.password);
       createObject(OBJ_WIN, WIN_WIFI_PWD);
       createObject(OBJ_TXT, TXT_PWD);
       createObject(OBJ_KEYBOARD, KEYB_PWD);
       createObject(OBJ_BUTTON, BUT_PWD_OK);
       createObject(OBJ_BUTTON, BUT_PWD_CNCL);
       newEvent(OBJ_WIN, WIN_WIFI_PWD, EVNT_DRAW);
+      break;
+    case WIN_WIFI_NET_NAME:
+      txtData[TXT_PWD].maxLength = NAME_LNG;
+      snprintf(keybPwdBuf, NAME_LNG + 1, wifiSetting.network);
+      createObject(OBJ_WIN, WIN_WIFI_NET_NAME);
+      createObject(OBJ_TXT, TXT_PWD);
+      createObject(OBJ_KEYBOARD, KEYB_PWD);
+      createObject(OBJ_BUTTON, BUT_PWD_OK);
+      createObject(OBJ_BUTTON, BUT_PWD_CNCL);
+      newEvent(OBJ_WIN, WIN_WIFI_NET_NAME, EVNT_DRAW);
+      break;
+    case WIN_WIFI_NET:
+      createObject(OBJ_WIN, WIN_WIFI_NET);
+      createObject(OBJ_LABEL, LBL_WIFI_NET);
+      createObject(OBJ_RADIO, RAD_NETWORKS);
+      createObject(OBJ_TXT, TXT_NETWORK_0);
+      createObject(OBJ_TXT, TXT_NETWORK_1);
+      createObject(OBJ_TXT, TXT_NETWORK_2);
+      createObject(OBJ_TXT, TXT_NETWORK_3);
+      createObject(OBJ_BUTTON, BUT_WIFI_SEL);
+      createObject(OBJ_BUTTON, BUT_WIFI_CFG);
+      createObject(OBJ_ICON, ICON_NET_WIFI);
+      createObject(OBJ_ICON, ICON_NET_SCR);
+      newEvent(OBJ_WIN, WIN_WIFI_NET, EVNT_DRAW);
       break;
     case WIN_PROTOCOL:
       radioData[RAD_PROTOCOL].value = wifiSetting.protocol - CLIENT_Z21;
@@ -102,6 +129,7 @@ void openWindow(uint16_t id) {
       createObject(OBJ_WIN, WIN_THROTTLE);
       createObject(OBJ_ICON, ICON_MENU);
       createObject(OBJ_ICON, ICON_POWER);
+      createObject(OBJ_LPIC, LPIC_MAIN);
       createObject(OBJ_ICON, ICON_FNEXT);
       createObject(OBJ_ICON, ICON_LOK_EDIT);
       createObject(OBJ_FNC, FNC_ACC_PANEL);
@@ -110,7 +138,6 @@ void openWindow(uint16_t id) {
       createObject(OBJ_TXT, TXT_CLOCK);
       createObject(OBJ_TXT, TXT_LOCO_NAME);
       createObject(OBJ_TXT, TXT_LOCO_ADDR);
-      createObject(OBJ_LPIC, LPIC_MAIN);
       createObject(OBJ_GAUGE, GAUGE_SPEED);
       createObject(OBJ_LABEL, LBL_KMH);
       createObject(OBJ_FNC, FNC_FX0);
@@ -150,12 +177,18 @@ void openWindow(uint16_t id) {
     case WIN_SCREEN:
       barData[BAR_BLIGHT].value = backlight;
       switchData[SW_ROTATE].state = (locationUSB == USB_UP);
+      switchData[SW_RGB_LED].state = (activeRGB > 0);
       createObject(OBJ_WIN, WIN_SCREEN);
       createObject(OBJ_ICON, ICON_BLIGHT);
       createObject(OBJ_BAR, BAR_BLIGHT);
       createObject(OBJ_SWITCH, SW_ROTATE);
+#if (USE_RGB_LED == PRESENT)
+      createObject(OBJ_SWITCH, SW_RGB_LED);
+      createObject(OBJ_DRAWSTR, DSTR_RGB);
+#endif
       createObject(OBJ_LABEL, LBL_SCR_ROTATE);
       createObject(OBJ_BUTTON, BUT_CFG_TOUCH);
+      createObject(OBJ_BUTTON, BUT_CFG_SW);
       createObject(OBJ_BUTTON, BUT_SCR_OK);
       createObject(OBJ_BUTTON, BUT_SCR_CNCL);
       newEvent(OBJ_WIN, WIN_SCREEN, EVNT_DRAW);
@@ -209,6 +242,7 @@ void openWindow(uint16_t id) {
       snprintf (aboutPacoMouseCYD, PWD_LNG + 1, "v%s.%s%s", VER_H, VER_L, VER_R);
       snprintf (aboutIP,  PWD_LNG + 1, "IP:  %u.%u.%u.%u", WiFi.localIP().operator[](0), WiFi.localIP().operator[](1), WiFi.localIP().operator[](2), WiFi.localIP().operator[](3));
       snprintf (aboutMAC, PWD_LNG + 1, "MAC: %s", WiFi.macAddress().c_str());
+      winData[WIN_ABOUT].h = 220;
       createObject(OBJ_WIN, WIN_ABOUT);
       createObject(OBJ_DRAWSTR, DSTR_ABOUT);
       createObject(OBJ_LABEL, LBL_PACO_TXT);
@@ -217,6 +251,10 @@ void openWindow(uint16_t id) {
       createObject(OBJ_TXT, TXT_ABOUT_IP);
       createObject(OBJ_TXT, TXT_ABOUT_MAC);
       createObject(OBJ_LABEL, LBL_PACO_WEB);
+      if (sdDetected) {
+        winData[WIN_ABOUT].h = 290;
+        createObject(OBJ_BUTTON, BUT_UPDATE);
+      }
       newEvent(OBJ_WIN, WIN_ABOUT, EVNT_DRAW);
       break;
     case WIN_LOK_EDIT:
@@ -230,9 +268,9 @@ void openWindow(uint16_t id) {
       createObject(OBJ_WIN, WIN_LOK_EDIT);
       createObject(OBJ_LABEL, LBL_ADDR);
       createObject(OBJ_LABEL, LBL_IMAGE);
+      createObject(OBJ_LPIC, LPIC_LOK_EDIT);
       createObject(OBJ_LABEL, LBL_NAME);
       createObject(OBJ_LABEL, LBL_VMAX);
-      createObject(OBJ_LPIC, LPIC_LOK_EDIT);
       createObject(OBJ_TXT, TXT_EDIT_ADDR);
       createObject(OBJ_TXT, TXT_EDIT_NAME);
       createObject(OBJ_TXT, TXT_EDIT_IMAGE);
@@ -345,14 +383,10 @@ void openWindow(uint16_t id) {
       createObject(OBJ_WIN, WIN_OPTIONS);
       switch (wifiSetting.protocol) {
         case CLIENT_Z21:
-          //createObject(OBJ_SWITCH, SW_OPT_TT_OFFSET);
-          //createObject(OBJ_LABEL, LBL_OPT_TT_OFFSET);
           createObject(OBJ_SWITCH, SW_OPT_ADR);
           createObject(OBJ_LABEL, LBL_OPT_ADR);
           break;
         case CLIENT_XNET:
-          //createObject(OBJ_SWITCH, SW_OPT_TT_OFFSET);
-          //createObject(OBJ_LABEL, LBL_OPT_TT_OFFSET);
           break;
         case CLIENT_LNET:
           switchData[SW_OPT_DISCOVER].state = (autoIdentifyCS > 0) ? true : false;
@@ -836,6 +870,26 @@ void openWindow(uint16_t id) {
       createObject(OBJ_KEYBOARD, KEYB_STA);
       newEvent(OBJ_WIN, WIN_STA_KEYB, EVNT_DRAW);
       break;
+    case WIN_DEF_ACTION:
+      createObject(OBJ_WIN, WIN_DEF_ACTION);
+      createObject(OBJ_LABEL, LBL_DEF_ACTION);
+      createObject(OBJ_TXT, TXT_ACTION_BOOT);
+      createObject(OBJ_ICON, ICON_PREV_ACT);
+      createObject(OBJ_ICON, ICON_NEXT_ACT);
+      createObject(OBJ_BUTTON, BUT_ACT_OK);
+#if (USE_RGB_LED == FUNC_BUTTONS)
+      createObject(OBJ_TXT, TXT_ACTION_R);
+      createObject(OBJ_TXT, TXT_ACTION_G);
+      createObject(OBJ_TXT, TXT_ACTION_B);
+      createObject(OBJ_ICON, ICON_PREV_ACT_R);
+      createObject(OBJ_ICON, ICON_NEXT_ACT_R);
+      createObject(OBJ_ICON, ICON_PREV_ACT_G);
+      createObject(OBJ_ICON, ICON_NEXT_ACT_G);
+      createObject(OBJ_ICON, ICON_PREV_ACT_B);
+      createObject(OBJ_ICON, ICON_NEXT_ACT_B);
+#endif
+      newEvent(OBJ_WIN, WIN_DEF_ACTION, EVNT_DRAW);
+      break;
 
   }
 }
@@ -879,6 +933,11 @@ void alertWindow(byte err) {
       createObject(OBJ_LABEL, LBL_ASK_SURE);
       createObject(OBJ_BUTTON, BUT_SURE_OK);
       createObject(OBJ_BUTTON, BUT_SURE_CNCL);
+      break;
+    case ERR_FILE:
+      createObject(OBJ_ICON, ICON_WARNING);
+      createObject(OBJ_ICON, ICON_WARNING_ON);
+      createObject(OBJ_LABEL, LBL_NOT_FOUND);
       break;
   }
   newEvent(OBJ_WIN, WIN_ALERT, EVNT_DRAW);

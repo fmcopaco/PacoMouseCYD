@@ -85,6 +85,37 @@ void setAccAspect(uint16_t FAdr, uint16_t FAdr2, uint8_t aspect, uint16_t outs) 
   }
 }
 
+
+void changeAccPosition(uint16_t FAdr, bool state) {
+  uint8_t type, pos, aspect;
+  for (pos = 0; pos < 16; pos++) {
+    type = accPanel[pos].type;
+    if (accDef[type].aspects == 2) {                              // only for two aspects accessories
+      if (accPanel[pos].addr == FAdr) {
+        aspect = getAccAspect(accPanel[pos].activeOutput, state);
+        accPanel[pos].currAspect = aspect;
+        fncData[FNC_ACC0 + pos].idIcon = accDef[type].icon[aspect].fncIcon;
+        fncData[FNC_ACC0 + pos].color = accDef[type].icon[aspect].color;
+        fncData[FNC_ACC0 + pos].colorOn = accDef[type].icon[aspect].colorOn;
+        newEvent(OBJ_FNC, FNC_ACC0 + pos, EVNT_DRAW);
+      }
+    }
+  }
+}
+
+
+uint8_t getAccAspect(uint16_t activeOutput, bool state) {
+  uint16_t outAcc;
+  outAcc = state ? 0x0002 : 0x0001;
+  if ((activeOutput & 0x000F) == outAcc)
+    return 0;
+  outAcc = state ? 0x0020 : 0x0010;
+  if ((activeOutput & 0x00F0) == outAcc)
+    return 1;
+  return 0;
+}
+
+
 ////////////////////////////////////////////////////////////
 // ***** PANEL  *****
 ////////////////////////////////////////////////////////////
@@ -131,9 +162,19 @@ void saveCurrentAspects() {
 }
 
 void getLastAspects() {
-  uint8_t n;
-  for (n = 0; n < 16; n++)
-    accPanel[n].currAspect = savedAspect[currPanel][n];
+  uint8_t n, type;
+  uint16_t FAdr;
+  bool state;
+  for (n = 0; n < 16; n++) {
+    type = accPanel[n].type;
+    if (accDef[type].aspects == 2) {                              // only for two aspects accessories
+      FAdr = accPanel[n].addr;
+      state = bitRead(accPosition[FAdr >> 3], FAdr & 0x0007);
+      accPanel[n].currAspect =  getAccAspect(accPanel[n].activeOutput, state);
+    }
+    else
+      accPanel[n].currAspect = savedAspect[currPanel][n];
+  }
 }
 
 void deleteLastAspects() {
@@ -143,14 +184,16 @@ void deleteLastAspects() {
 }
 
 void initLastAspects() {
-  uint8_t i, j;
+  uint16_t i, j;
   for (i = 0; i < 16; i++)
     for (j = 0; j < 16; j++)
       savedAspect[i][j] = 0;;
+  for (i = 0; i < 256; i++)
+    accPosition[i] = 0;
 }
 
 void populateAccPanel() {
-  loadDefaultAccPanel();              // Load panel data
+  loadDefaultAccPanel();                                          // Load panel data
   if (sdDetected) {
     if (loadAccPanel(SD))
       getLastAspects();
@@ -292,7 +335,7 @@ void accTypeClick() {
       deleteAccPanelElement(paramChild);
       accPanel[paramChild].type = ACC_KEYPAD;
       updateAccPanel();
-      updateSpeedHID();                 // set encoder
+      updateSpeedHID();                                           // set encoder
       closeWindow(WIN_ACC_TYPE);
       break;
     default:
@@ -337,11 +380,11 @@ void accOutClick(uint8_t out) {
   outR = out & 0xFE;
   outG = out | 0x01;
   currAccEdit.activeOutput ^= bit(out);
-  if (bitRead(out, 0)) {                                        // green
+  if (bitRead(out, 0)) {                                          // green
     if (bitRead(currAccEdit.activeOutput, outG))
       bitClear(currAccEdit.activeOutput, outR);
   }
-  else {                                                        // red
+  else {                                                          // red
     if (bitRead(currAccEdit.activeOutput, outR))
       bitClear(currAccEdit.activeOutput, outG);
   }

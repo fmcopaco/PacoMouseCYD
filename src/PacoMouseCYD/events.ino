@@ -23,15 +23,23 @@ void eventProcess() {
           openWindow(WIN_THROTTLE);
           switch (initStatus) {
             case INIT_NO_WIFI:
-              openWindow(WIN_SSID);
+              openWindow(WIN_WIFI_NET);
               break;
             case INIT_NO_CONNECT:
               openWindow(WIN_WIFI);
               break;
             case INIT_NO_SD:
             case INIT_OK:
-              infoLocomotora(locoData[myLocoData].myAddr.address);
+              //infoLocomotora(locoData[myLocoData].myAddr.address);
               break;
+          }
+          actionSW_BOOT = getActionOption(EE_ACT_BOOT);                      // set button action
+          actionSW_R = getActionOption(EE_ACT_R);
+          actionSW_G = getActionOption(EE_ACT_G);
+          actionSW_B = getActionOption(EE_ACT_B);
+          if (digitalRead (SW_BOOT_PIN) == LOW) {
+            statusBOOT == LOW;
+            startCalibration();
           }
           break;
         case TMR_POWER:
@@ -98,10 +106,7 @@ void eventProcess() {
             }
             else {
               stopTimer(TMR_STA_RUN);
-              closeWindow(WIN_STA_PLAY);/*
-              updateStationTime(staTime);
-              updateTargetStations();
-*/
+              closeWindow(WIN_STA_PLAY);
               openWindow(WIN_STA_STARS);
             }
           }
@@ -112,7 +117,11 @@ void eventProcess() {
       break;
     case EVNT_DRAW:
       if (event.objType == OBJ_WIN)
+      {
         drawWindow(event.objID);
+        if (isWindow(WIN_THROTTLE))
+          setTimer(TMR_INFO, 1, TMR_ONESHOT);
+      }
       else
         drawObject(event.objType, event.objID);
       break;
@@ -126,9 +135,30 @@ void eventProcess() {
         closeWindow(event.objID);
       }
       break;
-    case EVNT_BOOT:
-      calibrationPending = true;
-      newEvent(OBJ_WIN, WIN_CALIBRATE, EVNT_WOPEN);
+    case EVNT_PRESS:
+#ifdef SCREEN_SEND
+      screenServer();
+#else
+      if (event.objType == OBJ_DATA) {
+        switch (event.objID) {
+          case DATA_CALIBRATE:
+            startCalibration();
+            break;
+          case DATA_SW_BOOT:
+            doAction(actionSW_BOOT);
+            break;
+          case DATA_SW_R:
+            doAction(actionSW_R);
+            break;
+          case DATA_SW_G:
+            doAction(actionSW_G);
+            break;
+          case DATA_SW_B:
+            doAction(actionSW_B);
+            break;
+        }
+      }
+#endif
       break;
     case EVNT_CLICK:
       aliveAndKicking();
@@ -150,6 +180,7 @@ void eventProcess() {
               switch (errType) {
                 case ERR_FULL:
                 case ERR_CHG_WIFI:
+                case ERR_FILE:
                   closeWindow(WIN_ALERT);
                   break;
                 case ERR_STOP:
@@ -178,7 +209,6 @@ void eventProcess() {
           switch (event.objID) {
             case BUT_CAL_OK:
               closeWindow(WIN_CALIBRATE);
-              bootPressed = false;
               saveCalibrationValues();                      // save calibration values
               DEBUG_MSG("Calibration window closed")
               break;
@@ -199,33 +229,47 @@ void eventProcess() {
               else {
                 n = atoi(keybPortBuf);
                 if ((wifiSetting.port != n) || (wifiSetting.CS_IP[0] != value) || (wifiSetting.CS_IP[1] != value2) || (wifiSetting.CS_IP[2] != value3) || (wifiSetting.CS_IP[3] != value4)) {
-                  eepromChanged = true;
                   wifiSetting.port = n;
                   wifiSetting.CS_IP[0] = value;
                   wifiSetting.CS_IP[1] = value2;
                   wifiSetting.CS_IP[2] = value3;
                   wifiSetting.CS_IP[3] = value4;
                   DEBUG_MSG("NewIP: %d.%d.%d.%d - Port: %d", wifiSetting.CS_IP[0], wifiSetting.CS_IP[1], wifiSetting.CS_IP[2], wifiSetting.CS_IP[3], wifiSetting.port)
-                  EEPROM.put(EE_WIFI, wifiSetting);
+                  updateWiFiSettings();
                 }
                 closeWindow(WIN_WIFI);
-                if (eepromChanged) {
-                  EEPROM.commit();
-                  eepromChanged = false;
-                  alertWindow(ERR_CHG_WIFI);
-                  DEBUG_MSG("Saving WiFi changes in EEPROM")
-                }
+                saveWiFiChanges();
               }
               break;
+            case BUT_WIFI_SEL:
+              closeWindow(WIN_WIFI_NET);
+              saveWiFiChanges();
+              break;
+            case BUT_WIFI_CFG:
+              closeWindow(WIN_WIFI_NET);
+              openWindow(WIN_WIFI);
+              break;
             case BUT_PWD_CNCL:
-              closeWindow(WIN_WIFI_PWD);
+              if (isWindow(WIN_WIFI_PWD))
+                closeWindow(WIN_WIFI_PWD);
+              if (isWindow(WIN_WIFI_NET_NAME))
+                closeWindow(WIN_WIFI_NET_NAME);
               break;
             case BUT_PWD_OK:
-              snprintf (wifiSetting.password, 64, "%s", keybPwdBuf);    //savePassword();
-              EEPROM.put(EE_WIFI, wifiSetting);
-              eepromChanged = true;
-              DEBUG_MSG("New password: %s", wifiSetting.password);
-              closeWindow(WIN_WIFI_PWD);
+              if (isWindow(WIN_WIFI_PWD)) {
+                snprintf (wifiSetting.password, PWD_LNG + 1, "%s", keybPwdBuf);
+                updateWiFiSettings();
+                DEBUG_MSG("New password: %s", wifiSetting.password);
+                closeWindow(WIN_WIFI_PWD);
+              }
+              if (isWindow(WIN_WIFI_NET_NAME)) {
+                snprintf (wifiSetting.network, NAME_LNG, "%s", keybPwdBuf);
+                snprintf (networkNameBuf, NAME_LNG + 1, "%s", keybPwdBuf);
+                snprintf (networkNamesBuf[radioData[RAD_NETWORKS].value], NAME_LNG + 1, "%s", keybPwdBuf);
+                updateWiFiSettings();
+                DEBUG_MSG("New network name: %s", wifiSetting.network);
+                closeWindow(WIN_WIFI_NET_NAME);
+              }
               break;
             case BUT_PROT_OK:
               closeWindow(WIN_PROTOCOL);
@@ -242,8 +286,11 @@ void eventProcess() {
             case BUT_SCR_OK:
               locationUSB = (switchData[SW_ROTATE].state) ? USB_UP : USB_DOWN;
               setRotationDisplay(locationUSB);
+              activeRGB = (switchData[SW_RGB_LED].state) ? LED_RGB_WHITE : LED_RGB_OFF;
+              setColorRGB(activeRGB);
               EEPROM.write(EE_USB_LOCATION, locationUSB);
               EEPROM.write(EE_BACKLIGHT, backlight);
+              EEPROM.write(EE_RGB_LED, activeRGB);
               eepromChanged = true;
               closeWindow(WIN_SCREEN);
               break;
@@ -287,8 +334,14 @@ void eventProcess() {
               closeWindow(WIN_LOCK);
               break;
             case BUT_CFG_TOUCH:
-              bootPressed = true;
-              newEvent(OBJ_WIN, WIN_CALIBRATE, EVNT_BOOT);
+              newEvent(OBJ_DATA, DATA_CALIBRATE, EVNT_PRESS);
+              break;
+            case BUT_CFG_SW:
+              setActionOption(actionSW_BOOT, SW_BOOT);
+              setActionOption(actionSW_R, SW_LED_R);
+              setActionOption(actionSW_G, SW_LED_G);
+              setActionOption(actionSW_B, SW_LED_B);
+              openWindow(WIN_DEF_ACTION);
               break;
             case BUT_CLOCK_CNCL:
               closeWindow(WIN_SET_CLOCK);
@@ -421,7 +474,7 @@ void eventProcess() {
               break;
             case BUT_CFG_I_WIFI:
             case BUT_CFG_T_WIFI:
-              openWindow(WIN_WIFI);
+              openWindow(WIN_WIFI_NET);
               break;
             case BUT_CFG_I_FCLK:
             case BUT_CFG_T_FCLK:
@@ -571,6 +624,9 @@ void eventProcess() {
                 updateAccPanel();
                 updateSpeedHID();                 // set encoder
                 closeWindow(WIN_ACC_TYPE);
+              }
+              if (isWindow(WIN_ABOUT)) {          // update firmware
+                updateFirmware();
               }
               break;
             case BUT_CV_LNCV:
@@ -765,6 +821,19 @@ void eventProcess() {
               updateTurnoutButtons();
               newEvent(OBJ_BUTTON, BUT_STA_ACC3, EVNT_DRAW);
               break;
+            case BUT_ACT_OK:
+              if ((actionSW_BOOT != EEPROM.read(EE_ACT_BOOT)) || (actionSW_R != EEPROM.read(EE_ACT_R)) || (actionSW_G != EEPROM.read(EE_ACT_G)) || (actionSW_B != EEPROM.read(EE_ACT_B))) {
+                EEPROM.write(EE_ACT_BOOT, actionSW_BOOT);
+                EEPROM.write(EE_ACT_R, actionSW_R);
+                EEPROM.write(EE_ACT_G, actionSW_G);
+                EEPROM.write(EE_ACT_B, actionSW_B);
+                EEPROM.commit();
+              }
+              closeWindow(WIN_DEF_ACTION);
+              break;
+            case BUT_UPDATE:
+              alertWindow(ERR_ASK_SURE);
+              break;
           }
           break;
         case OBJ_ICON:
@@ -773,7 +842,8 @@ void eventProcess() {
               showNextFuncBlock();
               break;
             case ICON_POWER:
-              togglePower();
+              if (notLocked())
+                togglePower();
               break;
             case ICON_MENU:
               openWindow(WIN_MENU);
@@ -782,11 +852,6 @@ void eventProcess() {
               if (notLockedOption(LOCK_SEL_LOCO))
                 openWindow(WIN_LOK_EDIT);
               break;
-            /*
-              case ICON_KEYB:
-              openWindow(WIN_ENTER_ADDR);
-              break;
-            */
             case ICON_SEL_LOK:
               currOrder = (currOrder == SORT_NAME_DWN) ? SORT_LAST : currOrder + 1;
               sortLocoList(currOrder);
@@ -828,6 +893,7 @@ void eventProcess() {
               closeWindow(WIN_ABOUT);
               break;
             case ICON_KEYB_ACC:
+              populateAccPanel();
               closeWindow(WIN_ACC_CTRL);
               break;
             case ICON_PLUS_ONE:
@@ -846,6 +912,30 @@ void eventProcess() {
                 eepromChanged = false;
                 openWindow(WIN_STA_EDIT);
               }
+              break;
+            case ICON_PREV_ACT:
+              actionSW_BOOT = prevAction(actionSW_BOOT, SW_BOOT, TXT_ACTION_BOOT);
+              break;
+            case ICON_NEXT_ACT:
+              actionSW_BOOT = nextAction(actionSW_BOOT, SW_BOOT, TXT_ACTION_BOOT);
+              break;
+            case ICON_PREV_ACT_R:
+              actionSW_R = prevAction(actionSW_R, SW_LED_R, TXT_ACTION_R);
+              break;
+            case ICON_NEXT_ACT_R:
+              actionSW_R = nextAction(actionSW_R, SW_LED_R, TXT_ACTION_R);
+              break;
+            case ICON_PREV_ACT_G:
+              actionSW_G = prevAction(actionSW_G, SW_LED_G, TXT_ACTION_G);
+              break;
+            case ICON_NEXT_ACT_G:
+              actionSW_G = nextAction(actionSW_G, SW_LED_G, TXT_ACTION_G);
+              break;
+            case ICON_PREV_ACT_B:
+              actionSW_B = prevAction(actionSW_B, SW_LED_B, TXT_ACTION_B);
+              break;
+            case ICON_NEXT_ACT_B:
+              actionSW_B = nextAction(actionSW_B, SW_LED_B, TXT_ACTION_B);
               break;
           }
           break;
@@ -944,6 +1034,7 @@ void eventProcess() {
             case FNC_STA_RAYO:
               if (isTrackOff())
                 resumeOperations();
+              break;
           }
           break;
         case OBJ_TXT:
@@ -966,10 +1057,9 @@ void eventProcess() {
               delay(200);
               if (scrSSID > 5)
                 txtID += (scrSSID - 5);
-              snprintf (wifiSetting.ssid, 32, WiFi.SSID(txtID).c_str());     //saveSSID(txtID);
-              EEPROM.put(EE_WIFI, wifiSetting);
+              snprintf (wifiSetting.ssid, 33, WiFi.SSID(txtID).c_str());     //saveSSID(txtID);
+              updateWiFiSettings();
               DEBUG_MSG("New SSID: %s", wifiSetting.ssid);
-              eepromChanged = true;
               closeWindow(WIN_SSID);
               openWindow(WIN_WIFI);
               break;
@@ -994,6 +1084,9 @@ void eventProcess() {
               keybData[KEYB_IP].idTextbox = TXT_IP1 + txtID;
               for (n = 0; n < 5; n++)
                 drawObject(OBJ_TXT, TXT_IP1 + n);
+              break;
+            case TXT_NETWORK:
+              openWindow(WIN_WIFI_NET_NAME);
               break;
             case TXT_PWD_HIDE:
               openWindow(WIN_WIFI_PWD);
@@ -1155,12 +1248,15 @@ void eventProcess() {
           switch (event.objID) {
             case SW_SHUNTING:
               switchData[SW_SHUNTING].state = !switchData[SW_SHUNTING].state;
-              //shuntingMode = switchData[SW_SHUNTING].state;
               newEvent(OBJ_SWITCH, SW_SHUNTING, EVNT_DRAW);
               break;
             case SW_ROTATE:
               switchData[SW_ROTATE].state = !switchData[SW_ROTATE].state;
               newEvent(OBJ_SWITCH, SW_ROTATE, EVNT_DRAW);
+              break;
+            case SW_RGB_LED:
+              switchData[SW_RGB_LED].state = !switchData[SW_RGB_LED].state;
+              newEvent(OBJ_SWITCH, SW_RGB_LED, EVNT_DRAW);
               break;
             case SW_LOCK_LOK:
               switchData[SW_LOCK_LOK].state = !switchData[SW_LOCK_LOK].state;
@@ -1228,8 +1324,7 @@ void eventProcess() {
               else
                 radioData[RAD_PROTOCOL_LN].value = radioData[RAD_PROTOCOL_LN].num;
               newEvent(OBJ_RADIO, RAD_PROTOCOL_LN, EVNT_DRAW);
-              EEPROM.put(EE_WIFI, wifiSetting);
-              eepromChanged = true;
+              updateWiFiSettings();
               setProtocolData();
               DEBUG_MSG("PROTOCOL %d", n);
               break;
@@ -1239,8 +1334,7 @@ void eventProcess() {
                 radioData[RAD_PROTOCOL_LN].value = n;
                 newEvent(OBJ_RADIO, RAD_PROTOCOL_LN, EVNT_DRAW);
                 wifiSetting.serverType = (n == 0) ? true : false;
-                EEPROM.put(EE_WIFI, wifiSetting);
-                eepromChanged = true;
+                updateWiFiSettings();
                 setProtocolData();
                 DEBUG_MSG("PROT. LN %d", n);
               }
@@ -1252,6 +1346,15 @@ void eventProcess() {
                 newEvent(OBJ_RADIO, RAD_CSTATION, EVNT_DRAW);
                 typeCmdStation = n;
               }
+              break;
+            case RAD_NETWORKS:
+              n = map(lastClickY, radioData[RAD_NETWORKS].y, radioData[RAD_NETWORKS].y + (radioData[RAD_NETWORKS].h * radioData[RAD_NETWORKS].num), 0, radioData[RAD_NETWORKS].num);
+              radioData[RAD_NETWORKS].value = n;
+              lng = EE_WIFI + (n * sizeof(wifiSetting));
+              EEPROM.get (lng, wifiSetting);
+              newEvent(OBJ_RADIO, RAD_NETWORKS, EVNT_DRAW);
+              EEPROM.write(EE_WIFI_NET, n);
+              eepromChanged = true;
               break;
           }
           break;
@@ -1437,6 +1540,7 @@ void eventProcess() {
                   }
                   break;
                 case KEYB_ACC:
+                  populateAccPanel();
                   closeWindow(WIN_ACC_CTRL);
                   break;
                 case KEYB_ACC_ADDR:

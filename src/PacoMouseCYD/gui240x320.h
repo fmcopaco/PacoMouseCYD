@@ -9,13 +9,13 @@
 // ***** WINDOW *****
 ////////////////////////////////////////////////////////////
 
-enum winObj {WIN_DEFAULT, WIN_LOGO, WIN_CALIBRATE, WIN_THROTTLE, WIN_SSID, WIN_WIFI, WIN_WIFI_PWD, WIN_PROTOCOL,
+enum winObj {WIN_DEFAULT, WIN_LOGO, WIN_CALIBRATE, WIN_THROTTLE, WIN_SSID, WIN_WIFI, WIN_WIFI_PWD, WIN_WIFI_NET_NAME, WIN_WIFI_NET, WIN_PROTOCOL,
              WIN_ALERT, WIN_CONFIG, WIN_SET_CLOCK, WIN_LOK_EDIT, WIN_EDIT_NAME, WIN_FUNC, WIN_CHG_FUNC, WIN_VMAX,
              WIN_SEL_LOCO, WIN_ENTER_ADDR, WIN_SEL_IMAGE, WIN_MENU, WIN_SCREEN, WIN_SPEED, WIN_ABOUT, WIN_LOCK,
              WIN_OPTIONS, WIN_SPEEDO, WIN_SPEEDO_LNG, WIN_SPEEDO_SCALE, WIN_READ_CV, WIN_PROG_CV, WIN_PROG_ADDR,
              WIN_PROG_LNCV, WIN_STEAM, WIN_UTIL, WIN_ACCESSORY, WIN_PANELS, WIN_PANEL_NAME, WIN_ACC_CTRL, WIN_ACC_ASPECT,
              WIN_ACC_TYPE, WIN_ACC_EDIT, WIN_ACC_NAME, WIN_ACC_ADDR1, WIN_ACC_ADDR2, WIN_WIFI_SCAN,
-             WIN_STA_RUN, WIN_STA_PLAY, WIN_STA_STARS, WIN_STA_EDIT, WIN_STA_KEYB,
+             WIN_STA_RUN, WIN_STA_PLAY, WIN_STA_STARS, WIN_STA_EDIT, WIN_STA_KEYB, WIN_DEF_ACTION,
              MAX_WIN_OBJ
             };
 
@@ -39,6 +39,8 @@ wWinObj winData[MAX_WIN_OBJ] = {
   {  0,   0, 240, 320, true, COLOR_WHITE, COLOR_DARKGREY},     // WIN_SSID
   {  0,   0, 240, 320, true, COLOR_WHITE, COLOR_BACKGROUND},   // WIN_WIFI
   {  0, 125, 240, 195, true, COLOR_WHITE, COLOR_BACKGROUND},   // WIN_WIFI_PWD
+  {  0, 125, 240, 195, true, COLOR_WHITE, COLOR_BACKGROUND},   // WIN_WIFI_NET_NAME
+  {  0,   0, 240, 320, true, COLOR_BLUE,  COLOR_WHITE},        // WIN_WIFI_NET
   {  0,   0, 240, 320, true, COLOR_WHITE, COLOR_WHITE},        // WIN_PROTOCOL
   { 15, 120, 210,  80, true, COLOR_BLACK, COLOR_WHITE},        // WIN_ALERT
   {  0,   0, 240, 320, true, COLOR_BLACK, COLOR_WHITE},        // WIN_CONFIG
@@ -52,7 +54,7 @@ wWinObj winData[MAX_WIN_OBJ] = {
   { 36,  30, 155, 245, true, COLOR_WHITE, COLOR_BACKGROUND},   // WIN_ENTER_ADDR
   {  0,   0, 240, 320, true, COLOR_NAVY,  COLOR_BACKGROUND},   // WIN_SEL_IMAGE
   {  0,   0, 240, 320, true, COLOR_AQUA,  COLOR_BLACK},        // WIN_MENU
-  { 15,  80, 210, 140, true, COLOR_BLACK, COLOR_WHITE},        // WIN_SCREEN
+  { 15,  80, 210, 180, true, COLOR_BLACK, COLOR_WHITE},        // WIN_SCREEN
   { 15, 120, 210, 160, true, COLOR_BLACK, COLOR_WHITE},        // WIN_SPEED
   {  5,  15, 230, 220, true, COLOR_NAVY,  COLOR_WHITE},        // WIN_ABOUT
   { 15, 120, 210, 160, true, COLOR_BLACK, COLOR_WHITE},        // WIN_LOCK
@@ -82,6 +84,11 @@ wWinObj winData[MAX_WIN_OBJ] = {
   { 10, 120, 220,  80, true, COLOR_BLACK, COLOR_WHITE},        // WIN_STA_STARS
   {  0,   0, 240, 320, true, COLOR_WHITE, COLOR_BLUE},         // WIN_STA_EDIT
   { 85,  75, 150, 200, true, COLOR_WHITE, COLOR_BACKGROUND},   // WIN_STA_KEYB
+#if (USE_RGB_LED == FUNC_BUTTONS)
+  {  0,  40, 240, 270, true, COLOR_ORANGE, COLOR_BLUE},        // WIN_DEF_ACTION
+#else
+  {  0,  40, 240, 150, true, COLOR_ORANGE, COLOR_BLUE},        // WIN_DEF_ACTION
+#endif
 };
 
 
@@ -92,7 +99,7 @@ wWinObj winData[MAX_WIN_OBJ] = {
 uint8_t currLanguage;
 
 enum labelObj {LBL_PACO_TXT, LBL_INIT, LBL_CONNECT, LBL_PRESS, LBL_CAL, LBL_CAL_DONE,
-               LBL_SCAN, LBL_SSID_SCAN, LBL_SSID, LBL_IP, LBL_PWD_HIDE, LBL_PORT, LBL_PROTOCOL,
+               LBL_WIFI_NET, LBL_SCAN, LBL_SSID_SCAN, LBL_SSID, LBL_IP, LBL_PWD_HIDE, LBL_PORT, LBL_PROTOCOL,
                LBL_SEL_PROT, LBL_SEL_Z21, LBL_SEL_XNET, LBL_SEL_ECOS, LBL_SEL_LNET, LBL_SEL_LBSERVER, LBL_SEL_BINARY, LBL_OPTIONS,
                LBL_NAME, LBL_ADDR, LBL_IMAGE, LBL_VMAX, LBL_FUNC, LBL_SERVICE, LBL_KMH, LBL_SHUNTING, LBL_RATE, LBL_CHG_WIFI,
                LBL_EDIT_FUNC, LBL_STACK_FULL, LBL_STOP_0, LBL_STOP_E, LBL_SEL_IMAGE,
@@ -104,7 +111,7 @@ enum labelObj {LBL_PACO_TXT, LBL_INIT, LBL_CONNECT, LBL_PRESS, LBL_CAL, LBL_CAL_
                LBL_CV, LBL_LNCV, LBL_POM, LBL_BITS, LBL_CV_ERROR, LBL_UTIL_SPEED, LBL_UTIL_STEAM, LBL_UTIL_SCAN, LBL_UTIL_STA,
                LBL_ASK_SURE, LBL_OPT_DISCOVER, LBL_LNCV_ART, LBL_LNCV_MOD, LBL_LNCV_NUM, LBL_ACC_TYPE, LBL_ACC_NAME, LBL_ACC_ADDR,
                LBL_STA_RUN, LBL_STA_LEVEL, LBL_STA_START, LBL_STA_INSTR, LBL_STA_EXCEL, LBL_STA_GREAT, LBL_STA_TIMEOUT,
-               LBL_STA_STATIONS, LBL_STA_TURNOUTS, LBL_STA_TIME, LBL_STA_DESC,
+               LBL_STA_STATIONS, LBL_STA_TURNOUTS, LBL_STA_TIME, LBL_STA_DESC, LBL_DEF_ACTION, LBL_ACTIONS, LBL_NOT_FOUND, LBL_UPDATE,
                MAX_LABEL_OBJ
               };
 
@@ -136,12 +143,13 @@ wLabelObj labelData[MAX_LABEL_OBJ] = {
   { 120, 160, FSSB12, COLOR_YELLOW, MC_DATUM},          // LBL_PRESS
   { 120,   0, FSS9,   COLOR_WHITE,  TC_DATUM},          // LBL_CAL
   { 120,   0, FSS9,   COLOR_GREEN,  TC_DATUM},          // LBL_CAL_DONE
+  { 120,  20, FSSB12, COLOR_BLUE,   MC_DATUM},          // LBL_WIFI_NET
   { 120, 120, FSSB12, COLOR_YELLOW, MC_DATUM},          // LBL_SCAN
   { 120,  25, FSSB12, COLOR_YELLOW, MC_DATUM},          // LBL_SSID_SCAN
-  {  10,  24, FSSB9,  COLOR_BLACK, TL_DATUM},           // LBL_SSID
-  {  10, 134, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_IP
-  {  10,  94, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_PWD_HIDE
-  {  10, 174, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_PORT
+  {  10,  39, FSSB9,  COLOR_BLACK, TL_DATUM},           // LBL_SSID
+  {  10, 138, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_IP
+  {  10, 100, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_PWD_HIDE
+  {  10, 176, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_PORT
   {  10, 214, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_PROTOCOL
   {  10,  10, FSSB9,  COLOR_BLACK,  TL_DATUM},          // LBL_SEL_PROT
   {  50,  50, FSS9,   COLOR_BLACK,  TL_DATUM},          // LBL_SEL_Z21
@@ -232,7 +240,10 @@ wLabelObj labelData[MAX_LABEL_OBJ] = {
   {  10,  90, FSSB9,  COLOR_WHITE,  TL_DATUM},          // LBL_STA_TURNOUTS
   {  10,  10, FSSB9,  COLOR_WHITE,  TL_DATUM},          // LBL_STA_TIME
   {  10, 130, FSS9,   COLOR_YELLOW, TL_DATUM},          // LBL_STA_DESC
-
+  { 120,  55, FSSB9,  COLOR_WHITE,  MC_DATUM},          // LBL_DEF_ACTION
+  {   0,   0, FSS9,   COLOR_WHITE,  MC_DATUM},          // LBL_ACTIONS
+  {  65, 140, FSSB9,  COLOR_BLACK,  ML_DATUM},          // LBL_NOT_FOUND
+  { 120, 270, FSS9,   COLOR_WHITE,  MC_DATUM},          // LBL_UPDATE
 
 };
 
@@ -276,6 +287,7 @@ const char drwStrEnglish[]   = {"K1S32,24"                                      
                                 "s9"
                                };
 const char drwStrGerman[]    = {"K0S32,24K2y8R32,8K6y8R32,8s9"};
+const char drwStrCzech[]     = {"K7S32,24K8r32,24K2Y12R32,12K1Y0p12,12T0,23s9"};
 const char drwStrClock[]     = {"K7C12"};               //{"K7C12K0X97Y138L97,140y6L97,146"};
 const char drwStrSelLok[]    = {"K0C21"};     // K10X133Y11R34,26"};
 const char drwStrMenu[]      = {"K11L239,40y40L239,80y40L239,120y40L239,160y40L239,200"};
@@ -293,10 +305,13 @@ const char drwStrWifiScan[]  = {"K0R240,257K10Y222L239,222X120Y290C27"};
 
 const char drwStrStaPlay[]   = {"K1d10D238,220K7X30Y100L210,100"};
 
+const char drwStrRGB[]       = {"K7S32,32K2X15Y8C7K1X7Y22C7K4X23Y22C7s9"};
 
-enum drwStrObj {DSTR_INIT, DSTR_INIT_STAT, DSTR_ENGLISH, DSTR_SPANISH, DSTR_CATALAN, DSTR_GERMAN,
+
+enum drwStrObj {DSTR_INIT, DSTR_INIT_STAT, DSTR_ENGLISH, DSTR_SPANISH, DSTR_CATALAN, DSTR_GERMAN, DSTR_CZECH,
                 DSTR_CLOCK, DSTR_SELLOK, DSTR_MENU, DSTR_CFG_MENU, DSTR_UTL_MENU, DSTR_ABOUT,
                 DSTR_SPEEDO_TRK, DSTR_SPEEDO_BLANK, DSTR_STEAM, DSTR_WIFI_SCAN, DSTR_STATION_PLAY,
+                DSTR_RGB,
                 MAX_DRAWSTR_OBJ
                };
 
@@ -313,6 +328,7 @@ wDrawStr drawStrData[MAX_DRAWSTR_OBJ] = {
   {  4,   8, drwStrSpanish},                            // DSTR_SPANISH
   {  4,   8, drwStrCatalan},                            // DSTR_CATALAN
   {  4,   8, drwStrGerman},                             // DSTR_GERMAN
+  {  4,   8, drwStrCzech},                              // DSTR_CZECH
   { 36, 141, drwStrClock},                              // DSTR_CLOCK
   { 58,  24, drwStrSelLok},                             // DSTR_SELLOK
   {  1,  40, drwStrMenu},                               // DSTR_MENU
@@ -324,6 +340,7 @@ wDrawStr drawStrData[MAX_DRAWSTR_OBJ] = {
   {  0,   0, drwStrSteam},                              // DSTR_STEAM
   {  0,   0, drwStrWifiScan},                           // DSTR_WIFI_SCAN
   {  1,   0, drwStrStaPlay},                            // DSTR_STATION_PLAY
+  { 80, 165, drwStrRGB},                                // DSTR_RGB
 };
 
 
@@ -361,6 +378,15 @@ wCharObj charData[MAX_CHAR_OBJ] = {
   {132, 110, '-', FSSB12, COLOR_WHITE},                 // CHAR_STA_TURNM
   {210, 110, '+', FSSB12, COLOR_WHITE},                 // CHAR_STA_TURNP
 };
+
+
+////////////////////////////////////////////////////////////
+// ***** DATA *****
+////////////////////////////////////////////////////////////
+
+enum dataObj {DATA_CALIBRATE, DATA_SW_BOOT, DATA_SW_R, DATA_SW_G, DATA_SW_B,
+              MAX_DATA_OBJ
+             };
 
 
 ////////////////////////////////////////////////////////////
@@ -617,7 +643,8 @@ enum iconObj {ICON_PACO, ICON_SDCARD, ICON_NO_SD, ICON_WIFI, ICON_NO_WIFI, ICON_
               ICON_MANOMETER, ICON_STEAM_CNCL, ICON_STEAM_EDIT, ICON_UTL_SPEED, ICON_UTL_EXIT, ICON_SURE_OK, ICON_SURE_CNCL, ICON_FIND_LNCV,
               ICON_ACC_CNCL, ICON_ACC_EDIT, ICON_TYPE_OK, ICON_TYPE_CNCL, ICON_KEYB_ACC, ICON_PLUS_ONE, ICON_UTL_SCAN, ICON_UTL_STA,
               ICON_STA_CLOCK, ICON_STA_STATION, ICON_STA_EDIT, ICON_STA_CNCL, ICON_STA_TARGET, ICON_STA_TRAIN, ICON_STA_PIN, ICON_STA_TIME, ICON_STA_COUNT,
-              ICON_STA_STOP, ICON_STA_TIMEOUT, ICON_STA_OK,
+              ICON_STA_STOP, ICON_STA_TIMEOUT, ICON_STA_OK, ICON_NET_OK, ICON_NET_CFG, ICON_NET_WIFI, ICON_NET_SCR, ICON_CFG_SW,
+              ICON_PREV_ACT, ICON_NEXT_ACT, ICON_ACT_OK, ICON_PREV_ACT_R, ICON_NEXT_ACT_R, ICON_PREV_ACT_G, ICON_NEXT_ACT_G, ICON_PREV_ACT_B, ICON_NEXT_ACT_B,
               MAX_ICON_OBJ
              };
 
@@ -638,7 +665,7 @@ wIconObj iconData[MAX_ICON_OBJ] = {
   { 85,  76, 16, 16, COLOR_RED,         cancel},          // ICON_NO_WIFI
   { 10,  12, 32, 24, COLOR_BLACK,       wifi},            // ICON_WIFI_SSID
   {202,  15, 16, 16, COLOR_RED,         cancel},          // ICON_WIFI_CLOSE
-  {104,  10, 32, 24, COLOR_BLACK,       wifi},            // ICON_WIFI_CFG
+  { 10,  10, 32, 24, COLOR_BLACK,       wifi},            // ICON_WIFI_CFG
   { 37, 284, 16, 16, COLOR_GREENYELLOW, ok},              // ICON_WIFI_OK
   {117, 294, 16, 16, COLOR_GREENYELLOW, ok},              // ICON_PWD_OK
   {197, 294, 16, 16, COLOR_RED,         cancel},          // ICON_PWD_CNCL
@@ -687,9 +714,9 @@ wIconObj iconData[MAX_ICON_OBJ] = {
   {  8, 208, 24, 24, COLOR_BLACK,       padlock},         // ICON_CFG_LOCK
   {  4, 244, 32, 32, COLOR_NAVY,        info},            // ICON_CFG_ABOUT
   {  4, 284, 32, 32, COLOR_BLACK,       prevP},           // ICON_CFG_EXIT
-  {170, 178, 24, 24, COLOR_BLACK,       touchscr},        // ICON_CFG_TOUCH
-  { 47, 182, 16, 16, COLOR_GREENYELLOW, ok},              // ICON_SCR_OK
-  {107, 182, 16, 16, COLOR_RED,         cancel},          // ICON_SCR_CNCL
+  {170, 218, 24, 24, COLOR_BLACK,       touchscr},        // ICON_CFG_TOUCH
+  { 47, 222, 16, 16, COLOR_GREENYELLOW, ok},              // ICON_SCR_OK
+  {107, 222, 16, 16, COLOR_RED,         cancel},          // ICON_SCR_CNCL
   {112, 242, 16, 16, COLOR_GREENYELLOW, ok},              // ICON_SPD_OK
   { 20, 180, 32, 32, COLOR_RED,         stop0},           // ICON_STOP
   {165,  75, 44, 64, COLOR_BLACK,       cara_paco44x64},  // ICON_ABOUT_PACO
@@ -733,6 +760,26 @@ wIconObj iconData[MAX_ICON_OBJ] = {
   {192, 162, 16, 16, COLOR_YELLOW,      cancel},          // ICON_STA_STOP
   {24,  148, 24, 24, COLOR_BLACK,       gameclock},       // ICON_STA_TIMEOUT
   {203,  18, 16, 16, COLOR_YELLOW,      ok},              // ICON_STA_OK
+  { 47, 222, 16, 16, COLOR_RED,         ok},              // ICON_NET_OK
+  {174, 218, 24, 24, COLOR_BLACK,       wrench},          // ICON_NET_CFG
+  {125, 276, 32, 24, COLOR_BLACK,       wifi},            // ICON_NET_WIFI
+  { 85, 272, 32, 32, COLOR_RED,         screen},          // ICON_NET_SCR
+  {170, 164, 32, 32, COLOR_BLACK,       pushbutton},      // ICON_CFG_SW
+  {  7,  92, 32, 32, COLOR_WHITE,       prevP},           // ICON_PREV_ACT
+  {200,  92, 32, 32, COLOR_WHITE,       nextP},           // ICON_NEXT_ACT
+#if (USE_RGB_LED == FUNC_BUTTONS)
+  {112, 273, 16, 16, COLOR_YELLOW,      ok},              // ICON_ACT_OK
+#else
+  {112, 153, 16, 16, COLOR_YELLOW,      ok},              // ICON_ACT_OK
+#endif
+  {  7, 132, 32, 32, COLOR_CANDY_RED, prevP},           // ICON_PREV_ACT_R
+  {200, 132, 32, 32, COLOR_CANDY_RED, nextP},           // ICON_NEXT_ACT_R
+  {  7, 172, 32, 32, COLOR_GREENYELLOW, prevP},         // ICON_PREV_ACT_G
+  {200, 172, 32, 32, COLOR_GREENYELLOW, nextP},         // ICON_NEXT_ACT_G
+  {  7, 212, 32, 32, COLOR_CYAN,      prevP},           // ICON_PREV_ACT_B
+  {200, 212, 32, 32, COLOR_CYAN,      nextP},           // ICON_NEXT_ACT_B
+
+
 };
 
 
@@ -759,7 +806,8 @@ enum buttonObj {BUT_CAL_OK, BUT_SSID_CLOSE, BUT_WIFI_OK, BUT_PWD_OK, BUT_PWD_CNC
                 BUT_ACC_OUT0, BUT_ACC_OUT1, BUT_ACC_OUT2, BUT_ACC_OUT3, BUT_ACC_OUT4, BUT_ACC_OUT5, BUT_ACC_OUT6, BUT_ACC_OUT7,
                 BUT_ACC_OUT8, BUT_ACC_OUT9, BUT_ACC_OUT10, BUT_ACC_OUT11, BUT_ACC_OUT12, BUT_ACC_OUT13, BUT_ACC_OUT14, BUT_ACC_OUT15,
                 BUT_TYPE_OK, BUT_TYPE_CNCL, BUT_STA_START, BUT_STA_CNCL, BUT_STA_ACC0, BUT_STA_ACC1, BUT_STA_ACC2, BUT_STA_ACC3, BUT_STA_STOP,
-                BUT_STA_EDIT, BUT_STA_STAM, BUT_STA_STAP, BUT_STA_TURNM, BUT_STA_TURNP,
+                BUT_STA_EDIT, BUT_STA_STAM, BUT_STA_STAP, BUT_STA_TURNM, BUT_STA_TURNP, BUT_WIFI_SEL, BUT_WIFI_CFG, BUT_CFG_SW, BUT_ACT_OK,
+                BUT_UPDATE,
                 MAX_BUT_OBJ
                };
 
@@ -817,9 +865,9 @@ wButtonObj buttonData[MAX_BUT_OBJ] = {
   { 41, 161, 198, 39, COLOR_WHITE, COLOR_WHITE,      OBJ_LABEL, LBL_CFG_FCLK},    // BUT_CFG_T_FCLK
   { 41, 201, 198, 39, COLOR_WHITE, COLOR_WHITE,      OBJ_LABEL, LBL_CFG_LOCK},    // BUT_CFG_T_LOCK
   { 41, 241, 198, 39, COLOR_WHITE, COLOR_WHITE,      OBJ_LABEL, LBL_CFG_ABOUT},   // BUT_CFG_T_ABOUT
-  {150, 170,  60, 40, COLOR_AQUA,  COLOR_CREAM,      OBJ_ICON,  ICON_CFG_TOUCH},  // BUT_CFG_TOUCH
-  { 30, 170,  50, 40, COLOR_AQUA,  COLOR_LIGHTBLACK, OBJ_ICON,  ICON_SCR_OK},     // BUT_SCR_OK
-  { 90, 170,  50, 40, COLOR_AQUA,  COLOR_LIGHTBLACK, OBJ_ICON,  ICON_SCR_CNCL},   // BUT_SCR_CNCL
+  {150, 210,  60, 40, COLOR_AQUA,  COLOR_CREAM,      OBJ_ICON,  ICON_CFG_TOUCH},  // BUT_CFG_TOUCH
+  { 30, 210,  50, 40, COLOR_AQUA,  COLOR_LIGHTBLACK, OBJ_ICON,  ICON_SCR_OK},     // BUT_SCR_OK
+  { 90, 210,  50, 40, COLOR_AQUA,  COLOR_LIGHTBLACK, OBJ_ICON,  ICON_SCR_CNCL},   // BUT_SCR_CNCL
   { 95, 230,  50, 40, COLOR_AQUA,  COLOR_LIGHTBLACK, OBJ_ICON,  ICON_SPD_OK},     // BUT_SPD_OK
   { 95, 230,  50, 40, COLOR_AQUA,  COLOR_CREAM,      OBJ_ICON,  ICON_LOCK},       // BUT_LOCK
   { 95, 230,  50, 40, COLOR_AQUA,  COLOR_LIGHTBLACK, OBJ_ICON,  ICON_OPT_OK},     // BUT_OPT_OK
@@ -925,6 +973,16 @@ wButtonObj buttonData[MAX_BUT_OBJ] = {
   {200,  50,  32, 32, COLOR_WHITE,  COLOR_BLACK,     OBJ_CHAR,  CHAR_STA_STAP},   // BUT_STA_STAP
   {120,  90,  32, 32, COLOR_WHITE,  COLOR_BLACK,     OBJ_CHAR,  CHAR_STA_TURNM},  // BUT_STA_TURNM
   {200,  90,  32, 32, COLOR_WHITE,  COLOR_BLACK,     OBJ_CHAR,  CHAR_STA_TURNP},  // BUT_STA_TURNP
+
+  { 30, 210,  50, 40, COLOR_AQUA,  COLOR_LIGHTGREY,  OBJ_ICON,  ICON_NET_OK},     // BUT_WIFI_SEL
+  {160, 210,  50, 40, COLOR_AQUA,  COLOR_LIGHTGREY,  OBJ_ICON,  ICON_NET_CFG},    // BUT_WIFI_CFG
+  {150, 160,  60, 40, COLOR_AQUA,  COLOR_WHITE,      OBJ_ICON,  ICON_CFG_SW},     // BUT_CFG_SW
+#if (USE_RGB_LED == FUNC_BUTTONS)
+  { 90, 265,  60, 32, COLOR_WHITE, COLOR_LIGHTGREY,  OBJ_ICON,  ICON_ACT_OK},     // BUT_ACT_OK
+#else
+  { 90, 145,  60, 32, COLOR_WHITE, COLOR_LIGHTGREY,  OBJ_ICON,  ICON_ACT_OK},     // BUT_ACT_OK
+#endif
+  { 20, 250, 200, 40, COLOR_WHITE, COLOR_ORANGE,     OBJ_LABEL, LBL_UPDATE},      // BUT_UPDATE
 };
 
 
@@ -932,7 +990,7 @@ wButtonObj buttonData[MAX_BUT_OBJ] = {
 // ***** RADIO BUTTON *****
 ////////////////////////////////////////////////////////////
 
-enum radioObj {RAD_STOP_MODE, RAD_PROTOCOL, RAD_PROTOCOL_LN, RAD_CSTATION,
+enum radioObj {RAD_STOP_MODE, RAD_PROTOCOL, RAD_PROTOCOL_LN, RAD_CSTATION, RAD_NETWORKS,
                MAX_RAD_OBJ
               };
 
@@ -952,6 +1010,7 @@ wRadioObj radioData[MAX_RAD_OBJ] = {
   { 10,  40, 35, 10, 4, 0, COLOR_BLUE, COLOR_LIGHTGREY},    //  RAD_PROTOCOL
   { 50, 180, 35, 10, 2, 0, COLOR_BLUE, COLOR_LIGHTGREY},    //  RAD_PROTOCOL_LN
   { 20, 110, 35, 10, 3, 0, COLOR_BLUE, COLOR_LIGHTGREY},    //  RAD_CSTATION
+  { 10,  46, 35, 10, 4, 0, COLOR_BLUE, COLOR_LIGHTGREY},    //  RAD_NETWORKS
 
 };
 
@@ -959,7 +1018,7 @@ wRadioObj radioData[MAX_RAD_OBJ] = {
 // ***** PROGRESS BAR *****
 ////////////////////////////////////////////////////////////
 
-enum barObj {BAR_INIT, BAR_BLIGHT, BAR_WAIT, BAR_JOHNSON, BAR_WATER, BAR_TENDER, BAR_BRAKE,
+enum barObj {BAR_INIT, BAR_BLIGHT, BAR_WAIT, BAR_JOHNSON, BAR_WATER, BAR_TENDER, BAR_BRAKE, BAR_UPDATE,
              MAX_BAR_OBJ
             };
 
@@ -986,6 +1045,8 @@ wBarObj barData[MAX_BAR_OBJ] = {
   { 40, 135,  12,  60,  0, COLOR_BLUE, COLOR_LIGHTGREY, COLOR_WHITE, COLOR_BLACK, 0, 50, 40},          // BAR_WATER
   {  5, 265,  10,  50,  0, COLOR_BLUE, COLOR_LIGHTGREY, COLOR_WHITE, COLOR_BLACK, 0, 500, 400},        // BAR_TENDER
   {175, 135,  50,   8,  8, COLOR_DARKGREY, COLOR_LIGHTGREY, COLOR_RED, COLOR_BLACK, 0, 4, 3},          // BAR_BRAKE
+  { 20, 250, 200,  40,  0, COLOR_DARKCYAN, COLOR_CYAN, COLOR_NAVY, COLOR_WHITE, 0, 100, 0},            // BAR_UPDATE
+
 };
 
 
@@ -999,7 +1060,7 @@ wBarObj barData[MAX_BAR_OBJ] = {
 enum locoPic {SYS_NO_LOK, SYS_ELOK, SYS_LOCO_2, SYS_LOCO_3, SYS_LOCO_4, SYS_LOCO_5, SYS_LOCO_6, SYS_LOCO_7, SYS_LOCO_8, SYS_LOCO_9, MAX_SYS_LPIC};
 
 enum locoPicObj {LPIC_MAIN, LPIC_LOK_EDIT, LPIC_SEL_IMG1, LPIC_SEL_IMG2, LPIC_SEL_IMG3, LPIC_SEL_IMG4, LPIC_SEL_IMG5, LPIC_SEL_IMG6,
-                 LPIC_SPEEDO, LPIC_STEAM,
+                 LPIC_SPEEDO,
                  MAX_LPIC_OBJ
                 };
 
@@ -1024,7 +1085,7 @@ wLpicObj lpicData[MAX_LPIC_OBJ] = {
   { 25, 200, SYS_NO_LOK},                               // LPIC_SEL_IMG5
   { 25, 240, SYS_NO_LOK},                               // LPIC_SEL_IMG6
   { 25,  16, SYS_NO_LOK},                               // LPIC_SPEEDO
-  { 32,   0, SYS_LOCO_4},                               // LPIC_STEAM
+
 };
 
 ////////////////////////////////////////////////////////////
@@ -1042,12 +1103,13 @@ typedef struct {                                        // Gauge data
   uint16_t  color;
   uint16_t  backgnd;
   uint16_t  value;                                      // 0..255
+  uint16_t  oldValue;
 } wGaugeObj;
 
 wGaugeObj gaugeData[MAX_GAUGE_OBJ] = {
-  { 120, 200, 0, COLOR_BLACK,   COLOR_DARKGREY,  0},    // GAUGE_SPEED
-  { 120, 220, 40, COLOR_BLUE,   COLOR_CYAN, 128},       // GAUGE_SPEEDO
-  { 120, 170, 46, COLOR_ORANGE, COLOR_CYAN, 128},       // GAUGE_STATION
+  { 120, 200, 0, COLOR_BLACK,   COLOR_DARKGREY,  0, 0}, // GAUGE_SPEED
+  { 120, 220, 40, COLOR_BLUE,   COLOR_CYAN, 128, 0},    // GAUGE_SPEEDO
+  { 120, 170, 46, COLOR_ORANGE, COLOR_CYAN, 128, 0},    // GAUGE_STATION
 
 };
 
@@ -1056,7 +1118,7 @@ wGaugeObj gaugeData[MAX_GAUGE_OBJ] = {
 // ***** TEXTBOX *****
 ////////////////////////////////////////////////////////////
 
-#define NAME_LNG    16                                  // loco names length
+#define NAME_LNG   16                                   // loco names length
 #define ADDR_LNG    4                                   // loco addr length
 #define SSID_LNG   24
 #define PWD_LNG    32
@@ -1140,7 +1202,9 @@ char staTurnout1Buf[ADDR_LNG + 1];
 char staTurnout2Buf[ADDR_LNG + 1];
 char staTurnout3Buf[ADDR_LNG + 1];
 char staTurnout4Buf[ADDR_LNG + 1];
-
+char networkNamesBuf[4][NAME_LNG + 1];
+char networkNameBuf[NAME_LNG + 1];
+char keybActionBuf[4][NAME_LNG + 1];
 
 enum textObj {TXT_SSID1, TXT_SSID2, TXT_SSID3, TXT_SSID4, TXT_SSID5, TXT_SSID6,
               TXT_IP1, TXT_IP2, TXT_IP3, TXT_IP4, TXT_PORT, TXT_SSID, TXT_PWD_HIDE, TXT_PWD, TXT_PROTOCOL,
@@ -1158,6 +1222,8 @@ enum textObj {TXT_SSID1, TXT_SSID2, TXT_SSID3, TXT_SSID4, TXT_SSID5, TXT_SSID6,
               TXT_ACC_ADDR, TXT_ACC_ADDR1, TXT_ACC_ADDR2, TXT_ACC_NAME, TXT_ACC_EDIT, TXT_STA_LEVEL, TXT_STA_STARS,
               TXT_STA_STATION, TXT_STA_CLOCK, TXT_STA_TIME, TXT_STA_COUNT, TXT_STA_STARC, TXT_STA_STARTTIME,
               TXT_STA_STATNUM, TXT_STA_TURNNUM, TXT_STA_TURNOUT1, TXT_STA_TURNOUT2, TXT_STA_TURNOUT3, TXT_STA_TURNOUT4,
+              TXT_NETWORK, TXT_NETWORK_0, TXT_NETWORK_1, TXT_NETWORK_2, TXT_NETWORK_3, TXT_ACTION_BOOT, TXT_ACTION_R,
+              TXT_ACTION_G, TXT_ACTION_B,
               MAX_TXT_OBJ
              };
 
@@ -1182,13 +1248,13 @@ wTxtObj txtData[MAX_TXT_OBJ] = {
   { 1, 170,  238, 40, COLOR_WHITE, COLOR_BLACK, COLOR_WHITE, false, SSID_LNG, ssidName4, FSS9},                     // TXT_SSID4
   { 1, 210,  238, 40, COLOR_WHITE, COLOR_BLACK, COLOR_WHITE, false, SSID_LNG, ssidName5, FSS9},                     // TXT_SSID5
   { 1, 250,  238, 40, COLOR_WHITE, COLOR_BLACK, COLOR_WHITE, false, SSID_LNG, ssidName6, FSS9},                     // TXT_SSID6
-  { 55, 130,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP1Buf, FSS9},                  // TXT_IP1
-  {100, 130,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP2Buf, FSS9},                  // TXT_IP2
-  {145, 130,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP3Buf, FSS9},                  // TXT_IP3
-  {190, 130,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP4Buf, FSS9},                  // TXT_IP4
-  { 80, 170,  60, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, PORT_LNG, keybPortBuf, FSS9},               // TXT_PORT
-  { 10,  50, 220, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, false, SSID_LNG, ssidName, FSS9},                 // TXT_SSID
-  {140,  90,  90, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, false, NAME_LNG, keybPwdHideBuf, FSS9},           // TXT_PWD_HIDE
+  { 55, 134,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP1Buf, FSS9},                  // TXT_IP1
+  {100, 134,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP2Buf, FSS9},                  // TXT_IP2
+  {145, 134,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP3Buf, FSS9},                  // TXT_IP3
+  {190, 134,  40, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, IP_LNG, keybIP4Buf, FSS9},                  // TXT_IP4
+  { 80, 172,  60, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, true, PORT_LNG, keybPortBuf, FSS9},               // TXT_PORT
+  { 10,  58, 220, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, false, SSID_LNG, ssidName, FSS9},                 // TXT_SSID
+  {140,  96,  90, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, false, NAME_LNG, keybPwdHideBuf, FSS9},           // TXT_PWD_HIDE
   { 10, 135, 220, 24, COLOR_BLACK, COLOR_YELLOW,     COLOR_WHITE, true, PWD_LNG,   keybPwdBuf, FSS9},               // TXT_PWD
   { 10, 240, 140, 24, COLOR_BLACK, COLOR_BACKGROUND, COLOR_WHITE, false, PWD_LNG,  keybProtoBuf, FSS9},             // TXT_PROTOCOL
   { 40,  72, 160, 24, COLOR_NAVY,  COLOR_BACKGROUND, COLOR_BACKGROUND, true, NAME_LNG, locoName, FSS7},             // TXT_LOCO_NAME
@@ -1279,7 +1345,7 @@ wTxtObj txtData[MAX_TXT_OBJ] = {
   {150,  90,  60, 31, COLOR_WHITE, COLOR_BLUE, COLOR_BLUE,       false, ACC_LNG,   staTimeBuf, FSS9},               // TXT_STA_CLOCK
   {150,   2,  55, 27, COLOR_WHITE, COLOR_BLUE, COLOR_BLUE,       false, ACC_LNG,   staTimeBuf, FSS9},               // TXT_STA_TIME
   { 60,   2,  55, 27, COLOR_WHITE, COLOR_BLUE, COLOR_BLUE,       false, ACC_LNG,   staStationsBuf, FSS9},           // TXT_STA_COUNT
-  { 22, 165,  40, 26, COLOR_WHITE, COLOR_BLUE - 0x0011, COLOR_BLUE - 0x0011,  true,  ADDR_LNG,  staStarsBuf, FSS9},    // TXT_STA_STARC
+  { 22, 165,  40, 26, COLOR_WHITE, COLOR_BLUE - 0x0011, COLOR_BLUE - 0x0011,  true,  ADDR_LNG,  staStarsBuf, FSS9}, // TXT_STA_STARC
 
   {120,  10,  60, 32, COLOR_WHITE, COLOR_BLUE, COLOR_WHITE,      true, IP_LNG,   staStartTimeBuf, FSS9},            // TXT_STA_STARTTIME
   {160,  50,  32, 32, COLOR_WHITE, COLOR_BLUE, COLOR_WHITE,      true, IP_LNG,   staStatNumBuf, FSS9},              // TXT_STA_STATNUM
@@ -1289,6 +1355,16 @@ wTxtObj txtData[MAX_TXT_OBJ] = {
   { 10, 235,  60, 32, COLOR_WHITE, COLOR_BLUE, COLOR_WHITE,      true, ADDR_LNG, staTurnout3Buf, FSS9},             // TXT_STA_TURNOUT3
   { 10, 270,  60, 32, COLOR_WHITE, COLOR_BLUE, COLOR_WHITE,      true, ADDR_LNG, staTurnout4Buf, FSS9},             // TXT_STA_TURNOUT4
 
+  { 50,  10, 180, 24, COLOR_BLUE,  COLOR_BACKGROUND, COLOR_WHITE, true, NAME_LNG, networkNameBuf, FSS9},            // TXT_NETWORK
+  { 50,  50, 180, 24, COLOR_BLACK, COLOR_WHITE, COLOR_WHITE,     false, NAME_LNG, networkNamesBuf[0], FSS9},        // TXT_NETWORK_0
+  { 50,  85, 180, 24, COLOR_BLACK, COLOR_WHITE, COLOR_WHITE,     false, NAME_LNG, networkNamesBuf[1], FSS9},        // TXT_NETWORK_1
+  { 50, 120, 180, 24, COLOR_BLACK, COLOR_WHITE, COLOR_WHITE,     false, NAME_LNG, networkNamesBuf[2], FSS9},        // TXT_NETWORK_2
+  { 50, 155, 180, 24, COLOR_BLACK, COLOR_WHITE, COLOR_WHITE,     false, NAME_LNG, networkNamesBuf[3], FSS9},        // TXT_NETWORK_3
+  { 45,  95, 150, 24, COLOR_WHITE, COLOR_ORANGE, COLOR_WHITE,    true,  NAME_LNG, keybActionBuf[0], FSS9},          // TXT_ACTION_BOOT
+  { 45, 135, 150, 24, COLOR_WHITE, COLOR_ORANGE, COLOR_WHITE,    true,  NAME_LNG, keybActionBuf[1], FSS9},          // TXT_ACTION_R
+  { 45, 175, 150, 24, COLOR_WHITE, COLOR_ORANGE, COLOR_WHITE,    true,  NAME_LNG, keybActionBuf[2], FSS9},          // TXT_ACTION_G
+  { 45, 215, 150, 24, COLOR_WHITE, COLOR_ORANGE, COLOR_WHITE,    true,  NAME_LNG, keybActionBuf[3], FSS9},          // TXT_ACTION_B
+
 };
 
 
@@ -1297,8 +1373,9 @@ wTxtObj txtData[MAX_TXT_OBJ] = {
 // ***** SWITCH *****
 ////////////////////////////////////////////////////////////
 
-enum switchObj {  SW_SHUNTING, SW_ROTATE, SW_LOCK_LOK, SW_LOCK_ACC, SW_LOCK_PRG, SW_OPT_TT_OFFSET, SW_OPT_ADR, SW_OPT_DISCOVER,
+enum switchObj {  SW_SHUNTING, SW_ROTATE, SW_LOCK_LOK, SW_LOCK_ACC, SW_LOCK_PRG, SW_OPT_ADR, SW_OPT_DISCOVER,
                   SW_POM, SW_STA_OR1, SW_STA_OR2, SW_STA_OR3, SW_STA_OR4, SW_STA_INV1, SW_STA_INV2, SW_STA_INV3, SW_STA_INV4,
+                  SW_RGB_LED,
                   MAX_SWITCH_OBJ
                };
 
@@ -1318,7 +1395,6 @@ wSwitchObj switchData[MAX_SWITCH_OBJ] = {
   { 25, 130, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_LOCK_LOK
   { 25, 165, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_LOCK_ACC
   { 25, 200, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_LOCK_PRG
-  { 15,  50, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_OPT_TT_OFFSET
   { 15, 155, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_OPT_ADR
   { 15,  85, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_OPT_DISCOVER
   { 15, 125, 21, COLOR_RED,  COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_POM
@@ -1330,6 +1406,7 @@ wSwitchObj switchData[MAX_SWITCH_OBJ] = {
   {170, 205, 21, COLOR_CYAN, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_STA_INV2
   {170, 240, 21, COLOR_CYAN, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_STA_INV3
   {170, 275, 21, COLOR_CYAN, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_STA_INV4
+  { 30, 170, 21, COLOR_BLUE, COLOR_DARKCYAN,  COLOR_WHITE, false},        // SW_RGB_LED
 
 };
 
@@ -1395,7 +1472,7 @@ typedef struct {                                        // Keyboard data
 } wKeybObj;
 
 wKeybObj keybData[MAX_KEYB_OBJ] = {
-  {150, 170, KEYB_KEYPAD, TXT_IP1},                   // KEYB_IP
+  {150, 172, KEYB_KEYPAD, TXT_IP1},                   // KEYB_IP
   {  0, 165, KEYB_ALPHA, TXT_PWD},                    // KEYB_PWD
   {142, 130, KEYB_KEYPAD, TXT_HOUR},                  // KEYB_CLOCK
   {  0, 165, KEYB_CAPS, TXT_NAME},                    // KEYB_NAME
