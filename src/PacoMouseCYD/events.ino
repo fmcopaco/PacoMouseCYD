@@ -42,6 +42,38 @@ void eventProcess() {
             startCalibration();
           }
           break;
+        case TMR_WIFI_CHK:
+          if (WiFi.status() == WL_CONNECTED) {
+            if (signalLost) {
+              iconData[ICON_POWER].color = COLOR_DARKGREY;
+              if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
+                drawObject(OBJ_ICON, ICON_POWER);
+              iconData[ICON_POWER].bitmap = power;
+              stopTimer(TMR_POWER);
+              signalLost = false;
+            }
+          }
+          else {
+            iconData[ICON_POWER].color = isWindow(WIN_STEAM) ? COLOR_SKYBLUE : COLOR_BACKGROUND;
+            if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
+              drawObject(OBJ_ICON, ICON_POWER);
+            setTimer (TMR_POWER, 5, TMR_PERIODIC);                          // Flash lost signal icon
+            iconData[ICON_POWER].bitmap = lost;                             // change icon to lost signal
+            setColorRGB(LED_RGB_OFF);
+            signalLost = true;
+          }
+#if (BATT_MODE != READ_UNUSED)
+          readBattLevel();
+          if (isWindow(WIN_BATT)) {
+            updateBattLevel();
+            newEvent(OBJ_BAR, BAR_BATT, EVNT_DRAW);
+            newEvent(OBJ_ICON, ICON_BATT_CHARGE, EVNT_DRAW);
+          }
+          if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM))) {
+            checkLowBatt();
+          }
+#endif
+          break;
         case TMR_POWER:
           if (iconData[ICON_POWER].color == COLOR_RED)
             iconData[ICON_POWER].color = COLOR_PINK;
@@ -603,9 +635,9 @@ void eventProcess() {
             case BUT_SURE_CNCL:
               closeWindow(WIN_ALERT);
               break;
-            case BUT_SURE_OK:                   // remove loco from system
+            case BUT_SURE_OK:
               closeWindow(WIN_ALERT);
-              if (isWindow(WIN_LOK_EDIT)) {
+              if (isWindow(WIN_LOK_EDIT)) {       // remove loco from system
                 closeWindow(WIN_LOK_EDIT);
                 n = locoData[myLocoData].myAddr.address;
                 clearLocoData(myLocoData);
@@ -617,9 +649,9 @@ void eventProcess() {
                 getNewLoco(locoStack[0]);
               }
               if (isWindow(WIN_ACC_TYPE)) {
-                editAccessory = false;
+                //editAccessory = false;
                 accPanelChanged = true;
-                winData[WIN_ACCESSORY].backgnd = COLOR_WHITE;
+                //winData[WIN_ACCESSORY].backgnd = COLOR_WHITE;
                 deleteAccPanelElement(paramChild);
                 updateAccPanel();
                 updateSpeedHID();                 // set encoder
@@ -654,13 +686,7 @@ void eventProcess() {
               sendLNCV(LNCV_REQID_CFGREQUEST, 0);
               break;
             case BUT_ACC_CNCL:
-              if (accPanelChanged) {
-                accPanelChanged = false;
-                if (sdDetected)
-                  saveCurrAccPanel(SD);
-                else
-                  saveCurrAccPanel(LittleFS);
-              }
+              savePanelChanges();
               closeWindow(WIN_ACCESSORY);
               break;
             case BUT_ACC_EDIT:
@@ -668,6 +694,7 @@ void eventProcess() {
                 editAccessory = !editAccessory;
                 winData[WIN_ACCESSORY].backgnd = editAccessory ? COLOR_PINK : COLOR_WHITE;
                 newEvent(OBJ_WIN, WIN_ACCESSORY, EVNT_DRAW);
+                savePanelChanges();
               }
               break;
             case BUT_ACC_0:
@@ -834,6 +861,61 @@ void eventProcess() {
             case BUT_UPDATE:
               alertWindow(ERR_ASK_SURE);
               break;
+            case BUT_CFG_BATT:
+              closeWindow(WIN_SCREEN);
+              editBatt = false;
+              updateBattLevel();
+              openWindow(WIN_BATT);
+              break;
+            case BUT_BATT_CNCL:
+              loadBatteryRange();
+              closeWindow(WIN_BATT);
+              break;
+            case BUT_BATT_OK:
+              saveBatteryRange();
+              closeWindow(WIN_BATT);
+              break;
+            case BUT_BATT_CFG:
+              if (!editBatt) {
+                buttonData[BUT_LOW_BATT].border = COLOR_AQUA;
+                buttonData[BUT_FULL_BATT].border = COLOR_AQUA;
+                updateBattData();
+                createObject(OBJ_BUTTON, BUT_BATT_CNCL);
+                createObject(OBJ_TXT, TXT_BATT);
+                newEvent(OBJ_BUTTON, BUT_LOW_BATT, EVNT_DRAW);
+                newEvent(OBJ_BUTTON, BUT_FULL_BATT, EVNT_DRAW);
+                newEvent(OBJ_BUTTON, BUT_BATT_CNCL, EVNT_DRAW);
+                newEvent(OBJ_TXT, TXT_BATT, EVNT_DRAW);
+                editBatt = true;
+              }
+              break;
+            case BUT_LOW_BATT:
+              if (editBatt) {
+                emptyBatt = getBattLevel();
+                updateBattData();
+                barData[BAR_BATT].value = 20;
+                barData[BAR_BATT].colorOn = COLOR_RED;
+                newEvent(OBJ_BAR, BAR_BATT, EVNT_DRAW);
+                newEvent(OBJ_ICON, ICON_BATT_CHARGE, EVNT_DRAW);
+                newEvent(OBJ_DRAWSTR, DSTR_BATT_L, EVNT_DRAW);
+                newEvent(OBJ_TXT, TXT_BATT, EVNT_DRAW);
+                eepromChanged = true;
+              }
+              break;
+            case BUT_FULL_BATT:
+              if (editBatt) {
+                fullBatt = getBattLevel();
+                updateBattData();
+                barData[BAR_BATT].value = 120;
+                barData[BAR_BATT].colorOn = COLOR_GREEN;
+                newEvent(OBJ_BAR, BAR_BATT, EVNT_DRAW);
+                newEvent(OBJ_ICON, ICON_BATT_CHARGE, EVNT_DRAW);
+                newEvent(OBJ_DRAWSTR, DSTR_BATT_F, EVNT_DRAW);
+                newEvent(OBJ_TXT, TXT_BATT, EVNT_DRAW);
+                eepromChanged = true;
+              }
+              break;
+
           }
           break;
         case OBJ_ICON:
@@ -1192,13 +1274,7 @@ void eventProcess() {
               if (editAccessory)
                 openWindow(WIN_PANEL_NAME);
               else {
-                if (accPanelChanged) {
-                  accPanelChanged = false;
-                  if (sdDetected)
-                    saveCurrAccPanel(SD);
-                  else
-                    saveCurrAccPanel(LittleFS);
-                }
+                savePanelChanges();
                 saveCurrentAspects();
                 openWindow(WIN_PANELS);
               }
@@ -1710,6 +1786,58 @@ void eventProcess() {
               n = map(lastClickX, barData[BAR_BRAKE].x, barData[BAR_BRAKE].x + barData[BAR_BRAKE].w, 0, 4);
               barData[BAR_BRAKE].value = n;
               newEvent(OBJ_BAR, BAR_BRAKE, EVNT_DRAW);
+              break;
+          }
+          break;
+        case OBJ_GAUGE:
+          switch (event.objID) {
+            case GAUGE_SPEED:
+              value = (encoderMax == 15) ? 14 : ((encoderMax == 31) ? 7 : 0);
+              if (lastClickX > gaugeData[GAUGE_SPEED].x) {
+                if (lastClickY > gaugeData[GAUGE_SPEED].y) {      // fourth quadrant
+                  if (encoderValue < tapSpeedSteps[value + TAP_STP5])
+                    encoderValue = tapSpeedSteps[value + TAP_STP5];
+                  else
+                    encoderValue = tapSpeedSteps[value + TAP_STP6];
+                }
+                else {                                            // third quadrant
+                  if (encoderValue < tapSpeedSteps[value + TAP_STP3])
+                    encoderValue = tapSpeedSteps[value + TAP_STP3];
+                  else {
+                    if (encoderValue < tapSpeedSteps[value + TAP_STP4])
+                      encoderValue = tapSpeedSteps[value + TAP_STP4];
+                    else {
+                      if (encoderValue > tapSpeedSteps[value + TAP_STP5])
+                        encoderValue = tapSpeedSteps[value + TAP_STP5];
+                      else
+                        encoderValue = tapSpeedSteps[value + TAP_STP4];
+                    }
+                  }
+                }
+              }
+              else {
+                if (lastClickY > gaugeData[GAUGE_SPEED].y) {      // first quadrant
+                  if (encoderValue > tapSpeedSteps[value + TAP_STP1])
+                    encoderValue = tapSpeedSteps[value + TAP_STP1];
+                  else
+                    encoderValue = tapSpeedSteps[value + TAP_STP0];
+                }
+                else {                                            // second quadrant
+                  if (encoderValue < tapSpeedSteps[value + TAP_STP1])
+                    encoderValue = tapSpeedSteps[value + TAP_STP1];
+                  else {
+                    if (encoderValue < tapSpeedSteps[value + TAP_STP2])
+                      encoderValue = tapSpeedSteps[value + TAP_STP2];
+                    else {
+                      if (encoderValue > tapSpeedSteps[value + TAP_STP3])
+                        encoderValue = tapSpeedSteps[value + TAP_STP3];
+                      else
+                        encoderValue = tapSpeedSteps[value + TAP_STP2];
+                    }
+                  }
+                }
+              }
+              updateMySpeed();
               break;
           }
           break;

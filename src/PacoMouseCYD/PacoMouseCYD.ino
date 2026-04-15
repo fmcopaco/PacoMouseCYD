@@ -33,12 +33,13 @@
        v0.8     15dec25   Added ECoS/CS1 protocol. Updated user defined CYDs. Changes in modal windows.
        v0.9     03jan26   Added Station Run for kids. Corrected minor bugs on loconet
        v0.10    12feb26   Correct little bugs, clean and made more coherent code. Updating accessories. Status RGB LED. Up to 4 WiFi networks. Control of loco in accessory panel. Define actions for buttons. Added Czech language. Update from SD.
+       v0.11    18mar26   Changes in config.h for easy setup. Tapping gauge controls speed. Added French language. Check WLAN connection. Battery level. Changes in encoder.
 */
 
 // PacoMouseCYD program version
 #define VER_H "0"
-#define VER_L "10"
-#define VER_R "d"
+#define VER_L "11"
+#define VER_R "c"
 
 
 //#define DEBUG                                               // Descomentar para mensajes de depuracion
@@ -105,8 +106,6 @@ TFT_eSprite sprite = TFT_eSprite(&tft);
 uint8_t backlight;
 uint8_t currBacklight;
 
-//uint16_t oldNeedle;
-
 #define USB_UP      2                                       // Display USB up
 #define USB_DOWN    0                                       // Display USB down
 
@@ -114,6 +113,12 @@ uint8_t locationUSB;
 uint8_t activeRGB;
 
 enum colorRGB {LED_RGB_OFF, LED_RGB_BLUE, LED_RGB_RED, LED_RGB_GREEN = 4, LED_RGB_WHITE = 7};
+
+bool editBatt;
+uint16_t fullBatt;
+uint16_t emptyBatt;
+uint16_t currBatt;
+
 
 ////////////////////////////////////////////////////////////
 // ***** TOUCHSCREEN *****
@@ -153,8 +158,6 @@ volatile byte encoderMax;
 volatile bool encoderChange;
 volatile bool encoderNeedService;
 
-#define ENC_DEBOUNCE  3
-
 byte statusSwitch;
 bool switchOn;
 const unsigned long timeoutButtons = 50;                    // temporizador antirebote
@@ -172,7 +175,7 @@ enum Settings {
   EE_ADRH, EE_ADRL, EE_STOP_MODE, EE_SHUNTING, EE_ROCO, EE_LOCK, EE_SHORT, EE_USB_LOCATION, EE_CMD_STA, EE_CMD_AUTO,
   EE_STA_ADRH1, EE_STA_ADRL1, EE_STA_ADRH2, EE_STA_ADRL2, EE_STA_ADRH3, EE_STA_ADRL3, EE_STA_ADRH4, EE_STA_ADRL4,
   EE_STA_TRNDEF, EE_STA_TRNNUM, EE_STA_NUM, EE_STA_TIME, EE_RGB_LED, EE_ACT_BOOT, EE_ACT_R, EE_ACT_G, EE_ACT_B,
-  EE_UNDEF0, EE_UNDEF1, EE_UNDEF2, EE_UNDEF3, EE_UNDEF4,
+  EE_FULL_H, EE_FULL_L, EE_EMPTY_H, EE_EMPTY_L, EE_UNDEF4,
   EE_WIFI_NET, EE_WIFI,                                     //  datos WiFi. (Tiene que ser el ultimo)
 }; // EEPROM settings
 
@@ -194,7 +197,7 @@ struct {
   int  ok;
 } wifiSetting;
 
-enum typeProto {CLIENT_Z21, CLIENT_XNET, CLIENT_ECOS, CLIENT_LNET};
+enum typeProto {CLIENT_Z21, CLIENT_XNET, CLIENT_ECOS, CLIENT_LNET, CLIENT_CS2};
 
 WiFiClient Client;
 WiFiUDP Udp;
@@ -202,6 +205,7 @@ WiFiUDP Udp;
 #define z21Port   21105                                     // local port to listen on command station
 #define XnetPort   5550
 #define ECoSPort  15471
+#define CS2Port   15731
 
 uint16_t networks;
 uint8_t scrSSID;
@@ -232,6 +236,7 @@ uint16_t channel_color[] = {
 uint8_t scan_count = 0;
 uint8_t ap_count[14];
 int32_t max_rssi[14];
+bool signalLost;
 
 ////////////////////////////////////////////////////////////
 // ***** GUI *****
@@ -261,6 +266,13 @@ byte csStatus = 0;
 byte stopMode;
 bool shuntingMode;
 byte shortAddress;
+
+byte tapSpeedSteps[] = {0, 8, 20, 31, 43, 54, 63,           // 128 steps
+                        0, 6, 10, 15, 20, 26, 31,           // 28 steps
+                        0, 2,  4,  7, 10, 13, 15,           // 14 steps
+                       };
+
+enum tapSteps {TAP_STP0, TAP_STP1, TAP_STP2, TAP_STP3, TAP_STP4, TAP_STP5, TAP_STP6};
 
 byte scrHour, scrMin, scrRate, scrPosTime;
 byte clockHour, clockMin, clockRate;
@@ -323,8 +335,6 @@ uint16_t locoImageIndex;
 
 enum locoSort {SORT_LAST, SORT_NUM_UP, SORT_NUM_DWN, SORT_NAME_UP, SORT_NAME_DWN};
 uint16_t currOrder;
-
-
 
 struct {
   unsigned int id;                                          // stack loco data
@@ -777,9 +787,13 @@ void setup() {
   // NOTE: this needs to be done after tft.init()
   touchscreen.begin(TFT_WIDTH, TFT_HEIGHT);
   setRotationDisplay(locationUSB);
+
   copyOutA = digitalRead (ENCODER_A);                       // init encoder ISR
   copyOutB = 0x80;
-  attachInterrupt (digitalPinToInterrupt (ENCODER_A), encoderISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_A), encoderISR, CHANGE);
+#ifdef  ALTERNATE_ENCODER
+  attachInterrupt(digitalPinToInterrupt(ENCODER_B), encoderISR, CHANGE);
+#endif
 
   openWindow(WIN_LOGO);                                     // special window, don't use events just draw
   initStatus = initSequence();
@@ -826,6 +840,7 @@ void initVariables() {
   if (currLanguage >= MAX_LANG)
     currLanguage = LANG_ENGLISH;
   calibrationPending = false;
+  signalLost = false;
   for (pos = 0; pos < 4; pos++) {                           // WiFi networks
     value = EE_WIFI + (pos * sizeof(wifiSetting));
     EEPROM.get (value, wifiSetting);                        // read WiFi settings
@@ -863,7 +878,9 @@ void initVariables() {
   if (locationUSB > 0)
     locationUSB = USB_UP;
   activeRGB = EEPROM.read(EE_RGB_LED);
-  actionSW_BOOT = ACT_UNDEF;                                 // buttons & encoder
+  currBatt = 0;                                             // Battery
+  loadBatteryRange();
+  actionSW_BOOT = ACT_UNDEF;                                // buttons & encoder
   actionSW_R = ACT_UNDEF;
   actionSW_G = ACT_UNDEF;
   actionSW_B = ACT_UNDEF;
@@ -929,10 +946,7 @@ void initVariables() {
   staMaxStations = constrain(staMaxStations, 3, 5);
   staStartTime =   EEPROM.read(EE_STA_TIME);
 
-
 }
-
-
 
 
 void hidProcess() {
@@ -963,7 +977,6 @@ void setSpeedoPhase(uint8_t phase) {
   drawObject(OBJ_DRAWSTR, DSTR_SPEEDO_BLANK);
   drawObject(OBJ_ICON, ICON_SPEEDO_LOK);
 }
-
 
 
 ////////////////////////////////////////////////////////////

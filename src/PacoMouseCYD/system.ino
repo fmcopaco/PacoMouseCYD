@@ -25,6 +25,8 @@ void initPins() {
   pinMode(RGB_LED_G, INPUT);
   pinMode(RGB_LED_B, INPUT);
 #endif
+  analogReadResolution(12);                                       // LDR
+  analogSetPinAttenuation(LDR_INPUT, ADC_11db);
 }
 
 
@@ -55,7 +57,7 @@ void setColorRGB (uint16_t color) {                               // set color o
 #if (USE_RGB_LED == PRESENT)
   int state;
   if (activeRGB == 0)
-    color = 0;
+    color = LED_RGB_OFF;
   state = (color & 0x04) ? LOW : HIGH;
   digitalWrite(RGB_LED_G, state);
   state = (color & 0x02) ? LOW : HIGH;
@@ -66,9 +68,79 @@ void setColorRGB (uint16_t color) {                               // set color o
 #endif
 }
 
+void readBattLevel() {
+  uint16_t value;
+  value = currBatt >> 3;                                          // do some filtering
+  currBatt = currBatt - value;
+#if (BATT_MODE == READ_LDR)
+  value = analogRead(LDR_INPUT);
+#endif
+#if (BATT_MODE == READ_XPT)
+  value = touchscreen.readBattData();
+#endif
+  currBatt = currBatt + value;
+  DEBUG_MSG("BATT: %d (%d)", value, currBatt)
+}
+
+uint16_t getBattLevel() {
+  return  currBatt >> 3;
+}
+
+
+void updateBattLevel() {
+  uint16_t lng, n;
+  barData[BAR_BATT].colorOn = COLOR_GREEN;
+  n = getBattLevel();
+  if (n > fullBatt)
+    lng = 100;
+  else {
+    if (n < emptyBatt) {
+      lng = 0;
+      barData[BAR_BATT].colorOn = COLOR_RED;
+    }
+    else {
+      lng = map(n, emptyBatt, fullBatt, 0, 100);
+    }
+  }
+  barData[BAR_BATT].value = 20 + lng;
+  DEBUG_MSG("BATT: %d (%d-%d) - %d", n, emptyBatt, fullBatt, lng)
+}
+
+void updateBattData() {
+#if (BATT_MODE == READ_XPT)
+  snprintf(battBuf, NAME_LNG + 1, "%.2fV - %.2fV", (((float)(emptyBatt * 2.5) * 4) / 4096), (((float)(fullBatt * 2.5) * 4) / 4096));
+#else
+  snprintf(battBuf, NAME_LNG + 1, "%d  -  %d", emptyBatt, fullBatt);
+#endif
+}
+
+void checkLowBatt() {
+#if (BATT_MODE == READ_UNUSED)
+  iconData[ICON_LOW_BATT].color = isWindow(WIN_STEAM) ? COLOR_SKYBLUE : COLOR_BACKGROUND;
+#else
+  uint16_t id;
+  id = isWindow(WIN_STEAM) ? ICON_LBATT_STEAM : ICON_LOW_BATT;
+  if (iconData[ICON_LOW_BATT].color == COLOR_RED) {
+    if (getBattLevel() > emptyBatt) {
+      iconData[ICON_LOW_BATT].color = COLOR_BACKGROUND;
+      iconData[ICON_LBATT_STEAM].color = COLOR_SKYBLUE;
+      newEvent(OBJ_ICON, id, EVNT_DRAW);
+    }
+  }
+  else {
+    if (getBattLevel() <= emptyBatt) {
+      iconData[ICON_LOW_BATT].color = COLOR_RED;
+      iconData[ICON_LBATT_STEAM].color = COLOR_RED;
+      newEvent(OBJ_ICON, id, EVNT_DRAW);
+    }
+  }
+#endif
+}
+
 
 initResult initSequence() {                                       // Performs init sequence
   char label[MAX_LABEL_LNG];
+  int n, i;
   initResult result;
   result = INIT_OK;
   delay(500);
@@ -108,7 +180,10 @@ initResult initSequence() {                                       // Performs in
     n += 2;
     barData[BAR_INIT].value = 10 + n;
     drawObject(OBJ_BAR, BAR_INIT);
-	delay(500);
+    for (i = 0; i < 12; i++) {
+      delay(40);
+      readBattLevel();
+    }
     DEBUG_MSG(".");
   }
   barData[BAR_INIT].value = 90;
@@ -186,6 +261,8 @@ initResult initSequence() {                                       // Performs in
   barData[BAR_INIT].value = 100;
   drawObject(OBJ_BAR, BAR_INIT);
   setTimer (TMR_END_LOGO, 7, TMR_ONESHOT);                        // Wait for answer
+  setTimer (TMR_WIFI_CHK, 50, TMR_PERIODIC);                      // Check for connection every 5s
+  readBattLevel();
   return result;
 }
 
@@ -900,5 +977,28 @@ void saveWiFiChanges() {
     eepromChanged = false;
     alertWindow(ERR_CHG_WIFI);
     DEBUG_MSG("Saving WiFi changes in EEPROM")
+  }
+}
+
+void loadBatteryRange() {
+  fullBatt = (EEPROM.read(EE_FULL_H) << 8) + EEPROM.read(EE_FULL_L);
+  if (fullBatt > 4095)
+    fullBatt = 4095;
+  emptyBatt = (EEPROM.read(EE_EMPTY_H) << 8) + EEPROM.read(EE_EMPTY_L);
+  if (emptyBatt > 4095)
+    emptyBatt = (fullBatt > 400) ? (fullBatt - 400) : 0;
+  DEBUG_MSG("BATT Range: %d - %d", emptyBatt, fullBatt)
+}
+
+void saveBatteryRange() {
+  char txt[50];
+  if (eepromChanged) {
+    EEPROM.write (EE_FULL_H, highByte(fullBatt));
+    EEPROM.write (EE_FULL_L, lowByte(fullBatt));
+    EEPROM.write (EE_EMPTY_H, highByte(emptyBatt));
+    EEPROM.write (EE_EMPTY_L, lowByte(emptyBatt));
+    EEPROM.commit();
+    eepromChanged = false;
+    DEBUG_MSG("BATT saved")
   }
 }

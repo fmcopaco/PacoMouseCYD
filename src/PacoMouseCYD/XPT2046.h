@@ -36,6 +36,7 @@ class XPT2046_TS {
     void setCalibration(uint16_t xMin, uint16_t xMax, uint16_t yMin, uint16_t yMax);
     TouchCalibration getCalibration();
     void readData(uint16_t *x, uint16_t *y, uint16_t *z);
+    uint16_t readBattData();
 
   private:
     uint8_t _mosiPin;
@@ -49,6 +50,8 @@ class XPT2046_TS {
     uint16_t _yraw;
     uint16_t _zraw;
     uint32_t _msraw;
+    uint16_t _battraw;
+    bool     _readBatt;
     TouchCalibration cal;
 #ifdef USE_XPT2046_SPI
     SPIClass *hspi = NULL;

@@ -14,6 +14,7 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
   * Loconet: Command station detection for the correct control of functions F9 to F28.
   * Shunting mode for precise stopping.
   * Steam locomotive driving simulator
+  * Definition of actions for buttons
   * Control of accesories with 2, 3 or 4 aspects.
   * Multiple panels of accessories.
   * CV and LNCV programming
@@ -21,7 +22,10 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
   * Locking of some features for guest or club use.
   * Manually measurement of train speed
   * Station Run: Game for children
+  * Multiple WiFi networks
   * WiFi Analyzer
+  * Firmware update from SD
+  * Battery level option
   * Menus in different languages:
 
   ![Lang](images/languages.png)
@@ -45,12 +49,14 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
 - https://fmcopaco.github.io/
 - Read the [manual](doc/PacoMouseCYD_manual_v0.9.pdf) in the doc directory
 - Step-by-step assembly of PacoMouseCYD by [Isaac](https://www.iguadix.es/content/pacomouse-cyd)
+- Building the PacoMouseCYD Throttle by [Jindra Fučík](https://www.instructables.com/Building-the-PacoMouseCYD-DCC-Throttle/)
 
 ---
 
 ## Schematics
 
   ![Sch](images/schematics.png)
+  ![Sch](images/schematics_ky.png)
 
 The CYD (Cheap Yellow Display) has the following features:
 

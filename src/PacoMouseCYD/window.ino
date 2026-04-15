@@ -127,9 +127,11 @@ void openWindow(uint16_t id) {
     case WIN_THROTTLE:
       iconData[ICON_LOK_EDIT].bitmap = (wifiSetting.protocol == CLIENT_ECOS) ? info24 : wrench;
       createObject(OBJ_WIN, WIN_THROTTLE);
+      checkLowBatt();
       createObject(OBJ_ICON, ICON_MENU);
       createObject(OBJ_ICON, ICON_POWER);
       createObject(OBJ_LPIC, LPIC_MAIN);
+      createObject(OBJ_ICON, ICON_LOW_BATT);
       createObject(OBJ_ICON, ICON_FNEXT);
       createObject(OBJ_ICON, ICON_LOK_EDIT);
       createObject(OBJ_FNC, FNC_ACC_PANEL);
@@ -189,6 +191,9 @@ void openWindow(uint16_t id) {
       createObject(OBJ_LABEL, LBL_SCR_ROTATE);
       createObject(OBJ_BUTTON, BUT_CFG_TOUCH);
       createObject(OBJ_BUTTON, BUT_CFG_SW);
+#if (BATT_MODE != READ_UNUSED)
+      createObject(OBJ_BUTTON, BUT_CFG_BATT);
+#endif
       createObject(OBJ_BUTTON, BUT_SCR_OK);
       createObject(OBJ_BUTTON, BUT_SCR_CNCL);
       newEvent(OBJ_WIN, WIN_SCREEN, EVNT_DRAW);
@@ -523,10 +528,12 @@ void openWindow(uint16_t id) {
     case WIN_STEAM:
       fncData[FNC_ST_SMOKE].state = false;
       createObject(OBJ_WIN, WIN_STEAM);
+      checkLowBatt();
       createObject(OBJ_DRAWSTR, DSTR_STEAM);
       createObject(OBJ_ICON, ICON_POWER);
       createObject(OBJ_ICON, ICON_MANOMETER);
       createObject(OBJ_ICON, ICON_STEAM_EDIT);
+      createObject(OBJ_ICON, ICON_LBATT_STEAM);
       createObject(OBJ_BUTTON, BUT_STEAM_CNCL);
       createObject(OBJ_FNC, FNC_ST_WATER);
       createObject(OBJ_FNC, FNC_ST_TENDER);
@@ -889,6 +896,21 @@ void openWindow(uint16_t id) {
       createObject(OBJ_ICON, ICON_NEXT_ACT_B);
 #endif
       newEvent(OBJ_WIN, WIN_DEF_ACTION, EVNT_DRAW);
+      break;
+    case WIN_BATT:
+      buttonData[BUT_LOW_BATT].border = COLOR_WHITE;
+      buttonData[BUT_FULL_BATT].border = COLOR_WHITE;
+      createObject(OBJ_WIN, WIN_BATT);
+      createObject(OBJ_LABEL, LBL_BATT);
+      createObject(OBJ_DRAWSTR, DSTR_BATT);
+      createObject(OBJ_BAR, BAR_BATT);
+      createObject(OBJ_ICON, ICON_BATT_CHARGE);
+      createObject(OBJ_BUTTON, BUT_LOW_BATT);
+      createObject(OBJ_BUTTON, BUT_FULL_BATT);
+      createObject(OBJ_BUTTON, BUT_BATT_OK);
+      //createObject(OBJ_BUTTON, BUT_BATT_CNCL);
+      createObject(OBJ_BUTTON, BUT_BATT_CFG);
+      newEvent(OBJ_WIN, WIN_BATT, EVNT_DRAW);
       break;
   }
 }

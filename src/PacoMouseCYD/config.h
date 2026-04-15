@@ -4,76 +4,83 @@
 #ifndef PACOMOUSECYD_CFG_H
 #define PACOMOUSECYD_CFG_H
 
-#define CYD_TFT_28        0                                       // Cheap Yellow Display 2.8"
-#define CYD_TFT_24        1                                       // Cheap Yellow Display 2.4"
-#define CYD_TFT_32        2                                       // Cheap Yellow Display 3.2"
-#define CYD_USER_DEFINED  3                                       // User defined board
-
-#define UNUSED            0
-#define PRESENT           1
-#define FUNC_BUTTONS      2
-
-#define MODE_SPI          0
-#define MODE_BITBANG      1
-
-
 ////////////////////////////////////////////////////////////
 // ***** USER OPTIONS *****
 ////////////////////////////////////////////////////////////
 
-// Seleccione la version hardware del CYD (Cheap Yellow Display)   - Select the hardware version of CYD (Cheap Yellow Display):   CYD_TFT_28 / CYD_TFT_24 / CYD_TFT_32 / CYD_USER_DEFINED
+
+////////////////////////////////////////////////////////////
+// ***** CHEAP YELLOW DISPLAY SELECTION *****
+////////////////////////////////////////////////////////////
+
+#define CYD_TFT_28        0                                       // Cheap Yellow Display 2.8" (CYD 2432S028R). The only really supported.
+#define CYD_TFT_24        1                                       // Cheap Yellow Display 2.4" (CYD 2432S024R)
+#define CYD_TFT_32        2                                       // Cheap Yellow Display 3.2" (CYD 2432S032R)
+#define CYD_USER_DEFINED  3                                       // Cheap Yellow Display other type. User defined: Define the pins in CYD_USER_DEFINED.h
+#define CYD_ESP32_035     4                                       // Cheap Yellow Display 3.5" (ST7796 320x480)
+#define CYD_ESP32_32E     5                                       // Cheap Yellow Display 2.8" with ESP-32E, no free pins for encoder, use LED RGB pins instead. 
+
+
+// Seleccione la version hardware del CYD (Cheap Yellow Display) de la lista   - Select the hardware version of CYD (Cheap Yellow Display) from the list
 // Use el archivo User_Setup.h correcto para la libreria TFT_eSPI - Use the correct User_Setup.h file for library TFT_eSPI
 
 #define CYD_HW_VERSION                CYD_TFT_28
+
+
+////////////////////////////////////////////////////////////
+// ***** LED RGB PINS USE SELECTION *****
+////////////////////////////////////////////////////////////
+
+#define PRESENT           0                                       // LED RGB present. Normal use
+#define UNUSED            1                                       // LED RGB removed. Using LED RGB pins for encoder
+#define FUNC_BUTTONS      2                                       // LED RGB removed. Using LED RGB pins for pushbuttons (install pull-up resistors)
+
+
+// Seleccione el uso del LED RGB - Select use of the RGB LED: PRESENT / UNUSED / FUNC_BUTTONS
+
+#define USE_RGB_LED                   PRESENT 
+
+
+////////////////////////////////////////////////////////////
+// ***** BATTERY LEVEL READ SELECTION *****
+////////////////////////////////////////////////////////////
+
+#define READ_UNUSED       0                                       // Don't read Battery level. Normal use
+#define READ_LDR          1                                       // Using LDR pin for battery level. Remove LDR. (max. 3.3V)
+#define READ_XPT          2                                       // Using XPT2046 (pin 7). (max. 5V)
+
+
+// Seleccione el modo de lectura del nivel de bateria - Select mode to read battery level: READ_UNUSED / READ_LDR / READ_XPT
+
+#define BATT_MODE                     READ_UNUSED
+
+
+////////////////////////////////////////////////////////////
+// ***** LOCOMOTIVE STACK OPTIONS *****
+////////////////////////////////////////////////////////////
 
 // Max. locomotoras guardadas en stack (hasta 254) - Max. locomotives saved in stack (up to 254):
 
 #define LOCOS_IN_STACK                100
 
+
+////////////////////////////////////////////////////////////
+// ***** CSV FILE OPTIONS *****
+////////////////////////////////////////////////////////////
+
 // Delimitador en fichero CSV - CSV file delimiter: ';' / ','
+
 #define CSV_FILE_DELIMITER            ';'
 
 
-
-#if (CYD_HW_VERSION == CYD_USER_DEFINED)
 ////////////////////////////////////////////////////////////
-// ***** USER DEFINED HARDWARE *****
+// ***** ENCODER OPTIONS *****
 ////////////////////////////////////////////////////////////
 
-// Seleccione el modo de acceso al chip XPT2046 - Select XPT2046 chip access mode : MODE_SPI / MODE_BITBANG
-#define XPT_MODE      MODE_SPI
+// Si el encoder es impreciso pruebe a descomentar la siguiente linea - If the encoder is inaccurate, try uncommenting the following line
 
-// Seleccione rotacion de la pantalla tactil - Select Touchscreen rotation: 0 / 1 / 2 / 3
-#define XPT_ROTATION  3
+//#define  ALTERNATE_ENCODER  1
 
-// Touchscreen 
-#define XPT2046_IRQ   36    // T_IRQ
-#define XPT2046_MOSI  13    // T_DIN
-#define XPT2046_MISO  12    // T_OUT
-#define XPT2046_CLK   14    // T_CLK
-#define XPT2046_CS    33    // T_CS
-
-// Seleccione si usa el LED RGB - Select if use the RGB LED: PRESENT / UNUSED / FUNC_BUTTONS
-#define USE_RGB_LED   PRESENT 
-
-//RGB LED Pins
-#define RGB_LED_R     4
-#define RGB_LED_G     17
-#define RGB_LED_B     16
-
-//SD Pins
-#define SD_CS         5
-
-// Encoder Pins
-#define ENCODER_A     22
-#define ENCODER_B     21
-#define ENCODER_SW    35
-
-
-#endif
-////////////////////////////////////////////////////////////
-// ***** END OF USER DEFINED HARDWARE *****
-////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////
 // ***** END OF USER OPTIONS *****
@@ -84,102 +91,44 @@
 
 
 
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////
+//         DON'T MODIFY ANY OF THE FOLLOWING LINES        //
+//      NO MODIFICAR NINUNA DE LAS SIGUIENTES LINEAS      //
+////////////////////////////////////////////////////////////
+
+#define USER_MIN_BL         64                                    // User min backlight
+#define SYS_MIN_BL          32                                    // System inactivity backlight
+
+
 #if  (CYD_HW_VERSION == CYD_TFT_28)
-#define USE_CYD_28               1                           // Cheap Yellow Display 2.8" (2432S028R)
+#include "boards/CYD_TFT_28.h"
 #endif
 #if  (CYD_HW_VERSION == CYD_TFT_24)
-#define USE_CYD_24               1                           // Cheap Yellow Display 2.4" (2432S024R)
+#include "boards/CYD_TFT_24.h"
 #endif
 #if  (CYD_HW_VERSION == CYD_TFT_32)
-#define USE_CYD_24               1                           // Cheap Yellow Display 3.2" (2432S032R)
+#include "boards/CYD_TFT_32.h"
 #endif
 #if  (CYD_HW_VERSION == CYD_USER_DEFINED)
-#if (XPT_MODE == MODE_SPI)                                   // Cheap Yellow Display other type
-#define USE_XPT2046_SPI
+#include "CYD_USER_DEFINED.h"
 #endif
-#if (XPT_MODE == MODE_BITBANG)
-#define USE_XPT2046_BITBANG
+#if  (CYD_HW_VERSION == CYD_ESP32_035)
+#include "boards/CYD_ESP32_035.h"
 #endif
+#if  (CYD_HW_VERSION == CYD_ESP32_32E)
+#if (USE_RGB_LED != UNUSED)
+#error "Esta placa no tiene sufientes pins para el encoder, use los pines del LED RGB - This board hasn't enough pins for encoder, use RGB LED pins"
 #endif
-
-
-#if defined(USE_CYD_28) && defined(USE_CYD_24)
-#error Seleccione solo un tipo de CYD (Cheap Yellow Display) - Select only one type of CYD (Cheap Yellow Display)
-#endif
-
-
-
-#define USER_MIN_BL   64                                    // User min backlight
-#define SYS_MIN_BL    32                                    // System inactivity backlight
-
-#ifdef USE_CYD_28
-// Touchscreen pins
-#define XPT2046_IRQ   36    // T_IRQ
-#define XPT2046_MOSI  32    // T_DIN
-#define XPT2046_MISO  39    // T_OUT
-#define XPT2046_CLK   25    // T_CLK
-#define XPT2046_CS    33    // T_CS
-
-#define USE_XPT2046_BITBANG
-
-#define XPT_ROTATION  0
-
-/*
-// I2C pins
-#define I2C_SDA       27
-#define I2C_SCL       22
-*/
-//RGB LED
-#define RGB_LED_R     4
-#define RGB_LED_G    16
-#define RGB_LED_B    17
-
-#define USE_RGB_LED  PRESENT
-
-//SD Pins
-#define SD_CS         5
-
-// Encoder
-#define ENCODER_A    22
-#define ENCODER_B    27
-#define ENCODER_SW   35 
-
-
+#include "boards/CYD_ESP32_32E.h"
 #endif
 
-
-#ifdef USE_CYD_24
-// Touchscreen pins
-#define XPT2046_IRQ   36    // T_IRQ
-#define XPT2046_MOSI  13    // T_DIN
-#define XPT2046_MISO  12    // T_OUT
-#define XPT2046_CLK   14    // T_CLK
-#define XPT2046_CS    33    // T_CS
-
-#define USE_XPT2046_SPI
-
-#define XPT_ROTATION  0
-/*
-// I2C pins
-#define I2C_SDA       21
-#define I2C_SCL       22
-*/
-//RGB LED
-#define RGB_LED_R     4
-#define RGB_LED_G     17
-#define RGB_LED_B     16
-
-#define USE_RGB_LED  PRESENT
-
-//SD Pins
-#define SD_CS         5
-
-// Encoder
-#define ENCODER_A     22
-#define ENCODER_B     21
-#define ENCODER_SW    35 
-
-
-#endif
 
 #endif

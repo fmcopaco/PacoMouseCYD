@@ -129,7 +129,7 @@ uint16_t  lastClickY;
 ////////////////////////////////////////////////////////////
 
 enum timers {TMR_BLIGHT, TMR_END_LOGO, TMR_POWER, TMR_SPEEDO, TMR_INFO, TMR_WAIT, TMR_STEAM, TMR_ACCESSORY, TMR_SCAN, TMR_FNC_ECOS,
-             TMR_STA_RUN,
+             TMR_STA_RUN, TMR_WIFI_CHK,
              MAX_SYS_TIMER
             };
 

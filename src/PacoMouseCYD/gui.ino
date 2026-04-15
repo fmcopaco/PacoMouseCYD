@@ -201,6 +201,14 @@ void sendClickEvent(uint16_t x, uint16_t y) {
             break;
         }
         break;
+      case OBJ_GAUGE:
+        w = (gaugeData[id].r > 0) ? gaugeData[id].r : 68;     // gauge radius. Speed gauge has Radius = 0
+        xm = gaugeData[id].x - w;
+        ym = gaugeData[id].y - w;
+        xM = gaugeData[id].x + w;
+        yM = gaugeData[id].y + w;
+        //DEBUG_MSG("Gauge: X:%d-%d Y:%d-%d", xm, xM, ym, yM)
+        break;
       default:
         xm = tft.width();                               // other objects don't generate click event
         ym = tft.height();

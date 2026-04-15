@@ -430,6 +430,14 @@ void drawSpeed(uint16_t angle, uint16_t spd, uint16_t stp) {
   sprite.deleteSprite();
 }
 
+void drawStep (uint16_t stp) {
+  sprite.createSprite(36, 16);                              // 8bpp requires 36 * 16 = 576 bytes
+  sprite.fillSprite(COLOR_BACKGROUND);                      // Draw current step
+  sprite.setFreeFont(FSS7);
+  sprite.drawNumber(stp, 18, 8);
+  sprite.pushSprite(gaugeData[GAUGE_SPEED].x - 18, gaugeData[GAUGE_SPEED].y + 44, COLOR_TRANSPARENT);
+  sprite.deleteSprite();
+}
 
 void drawSpeedoStep() {
   uint16_t stp;

@@ -17,6 +17,8 @@ XPT2046_TS::XPT2046_TS(uint8_t mosiPin, uint8_t misoPin, uint8_t clkPin, uint8_t
   hspi = new SPIClass(HSPI);                                          // XPT2046 connected to HSPI in CYD 2.4"
   hspi->begin();
 #endif
+  _readBatt = false;
+  _battraw = 0;
 }
 
 
@@ -76,6 +78,13 @@ void XPT2046_TS::readData(uint16_t *x, uint16_t *y, uint16_t *z) {
 }
 
 
+uint16_t XPT2046_TS::readBattData() {
+  _readBatt = true;
+  update();
+  return (_battraw);                                                  // read raw data
+}
+
+
 #ifdef USE_XPT2046_BITBANG
 uint16_t XPT2046_TS::readSPI(byte command) {
   uint16_t result = 0;
@@ -121,6 +130,12 @@ void XPT2046_TS::update() {
   readSPI(0xD0);
   readSPI(0xD0);
   _yraw = readSPI(0xD0);
+  if (_readBatt) {
+    readSPI(0xA6);
+    readSPI(0xA6);
+    readSPI(0xA6);
+    _battraw = readSPI(0xA6);
+  }
   digitalWrite(_csPin, HIGH);
   _msraw = now;
   switch (cal.rotation) {
@@ -172,6 +187,12 @@ void XPT2046_TS::update() {
   hspi->transfer16(0xD0);
   hspi->transfer16(0xD0);
   _yraw = hspi->transfer16(0x0) >> 3;
+  if (_readBatt) {
+    hspi->transfer16(0xA6);
+    hspi->transfer16(0xA6);
+    hspi->transfer16(0xA6);
+    _battraw = hspi->transfer16(0xA6);
+  }
   digitalWrite(_csPin, HIGH);
   hspi->endTransaction();
   _msraw = now;

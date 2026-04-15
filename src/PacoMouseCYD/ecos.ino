@@ -875,6 +875,8 @@ void decodeReplyLoco() {
       scan(&T);
       if (T.token == T_INTLIT) {
         mySpeedStep = T.intvalue;
+        if (isWindow(WIN_THROTTLE))
+          drawStep(mySpeedStep);
         DEBUG_MSG("Steps: %d", T.intvalue);
       }
       break;

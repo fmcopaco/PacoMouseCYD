@@ -405,3 +405,13 @@ void updateAccChange() {
   accPanelChanged = true;
 }
 
+
+void savePanelChanges() {
+  if (accPanelChanged) {
+    accPanelChanged = false;
+    if (sdDetected)
+      saveCurrAccPanel(SD);
+    else
+      saveCurrAccPanel(LittleFS);
+  }
+}
