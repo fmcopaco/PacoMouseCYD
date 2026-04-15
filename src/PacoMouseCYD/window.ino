@@ -16,7 +16,7 @@ void openWindow(uint16_t id) {
       posObjStack1 = createObject(OBJ_LABEL, LBL_INIT);
       createObject(OBJ_ICON, ICON_PACO);
       createObject(OBJ_BAR, BAR_INIT);
-      drawWindow(WIN_LOGO);
+      startWindow(WIN_LOGO);
       break;
     case WIN_CALIBRATE:
       createObject(OBJ_WIN, WIN_CALIBRATE);
@@ -138,8 +138,8 @@ void openWindow(uint16_t id) {
       createObject(OBJ_TXT, TXT_CLOCK);
       createObject(OBJ_TXT, TXT_LOCO_NAME);
       createObject(OBJ_TXT, TXT_LOCO_ADDR);
-      createObject(OBJ_GAUGE, GAUGE_SPEED);
       createObject(OBJ_LABEL, LBL_KMH);
+      createObject(OBJ_GAUGE, GAUGE_SPEED);
       createObject(OBJ_FNC, FNC_FX0);
       createObject(OBJ_FNC, FNC_FX1);
       createObject(OBJ_FNC, FNC_FX2);
@@ -890,7 +890,6 @@ void openWindow(uint16_t id) {
 #endif
       newEvent(OBJ_WIN, WIN_DEF_ACTION, EVNT_DRAW);
       break;
-
   }
 }
 

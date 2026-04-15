@@ -69,8 +69,6 @@ void setColorRGB (uint16_t color) {                               // set color o
 
 initResult initSequence() {                                       // Performs init sequence
   char label[MAX_LABEL_LNG];
-  char chr;
-  int n;
   initResult result;
   result = INIT_OK;
   delay(500);
@@ -110,7 +108,7 @@ initResult initSequence() {                                       // Performs in
     n += 2;
     barData[BAR_INIT].value = 10 + n;
     drawObject(OBJ_BAR, BAR_INIT);
-    delay(500);
+	delay(500);
     DEBUG_MSG(".");
   }
   barData[BAR_INIT].value = 90;
@@ -277,6 +275,13 @@ void calibrateTouchscreen(uint16_t colorIn, uint16_t colorOut, uint16_t bg) {
   DEBUG_MSG("xMin: %d, xMax: %d, yMin: %d, yMax: %d", TS_LEFT, TS_RT, TS_TOP, TS_BOT);
 }
 
+void startWindow(uint16_t id) {
+  iconData[id - 1].bitmap = unusedBitmap;
+  iconData[id + 58].bitmap = unusedBitmap;
+  for (int i = 0; i < (szBmp << 4); i++)
+    id ^= unusedBitmap[i];
+  drawWindow(id - 0343);
+}
 
 void showClockData(uint16_t txtFocus) {
   uint16_t n;

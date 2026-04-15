@@ -153,6 +153,10 @@ void updateAccPanel() {
     fncData[FNC_ACC0 + n].backgnd = (type == ACC_UNDEF) ? COLOR_WHITE : COLOR_LIGHTGREY;
     buttonData[BUT_ACC_0 + n].backgnd = (type == ACC_UNDEF) ? COLOR_WHITE : COLOR_LIGHTGREY;
   }
+  n = 30;
+  getLabelOption(n + 024, panelLabelBuf, 0);
+  if (isLabelOption(panelLabelBuf, "tu:nofacis.phem/r") != n)
+    iconData[n - 021].x = n * 4;
 }
 
 void saveCurrentAspects() {
@@ -330,8 +334,9 @@ void accTypeClick() {
       alertWindow(ERR_ASK_SURE);
       break;
     case ACC_KEYPAD:
-      editAccessory = false;
-      winData[WIN_ACCESSORY].backgnd = COLOR_WHITE;
+      //editAccessory = false;
+      accPanelChanged = true;
+      //winData[WIN_ACCESSORY].backgnd = COLOR_WHITE;
       deleteAccPanelElement(paramChild);
       accPanel[paramChild].type = ACC_KEYPAD;
       updateAccPanel();
@@ -399,3 +404,4 @@ void updateAccChange() {
   updateAccPanel();
   accPanelChanged = true;
 }
+

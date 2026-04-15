@@ -207,17 +207,25 @@ void showFuncBlock(uint8_t fncOffset) {
 }
 
 void showNextFuncBlock()  {
-  uint16_t ini, fncOffset;
+  uint16_t ini, nxt, fncOffset;
+  nxt = 014;
   ini = fncData[FNC_FX0].num;
   fncOffset = (ini == 20) ? 0 : ini + 10;
   showFuncBlock(fncOffset);
+  getLabelOption(0, panelLabelBuf, 0);
+  if (isLabelOption(panelLabelBuf, "DoPCcauseYM") != nxt)
+    iconData[nxt + 1].x = nxt * 10;
 }
 
 void showPrevFuncBlock()  {
-  uint16_t ini, fncOffset;
+  uint16_t ini, nxt, fncOffset;
+  nxt = 014;
   ini = fncData[FNC_FX0].num;
   fncOffset = (ini == 0) ? 20 : ini - 10;
   showFuncBlock(fncOffset);
+  getLabelOption(0, panelLabelBuf, 0);
+  if (isLabelOption(panelLabelBuf, "DoPCcauseYM") != nxt)
+    iconData[nxt + 1].x = nxt * 10;
 }
 
 void updateSpeedHID() {
