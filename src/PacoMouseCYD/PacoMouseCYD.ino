@@ -35,11 +35,12 @@
        v0.10    12feb26   Correct little bugs, clean and made more coherent code. Updating accessories. Status RGB LED. Up to 4 WiFi networks. Control of loco in accessory panel. Define actions for buttons. Added Czech language. Update from SD.
        v0.11    18mar26   Changes in config.h for easy setup. Tapping gauge controls speed. Added French language. Check WLAN connection. Battery level. Changes in encoder.
        v0.12    16apr26   Added CS2 protocol. Gauge angle compensation in 28 steps. Added some function icons. Button actions for emergency stop & brake. Added Next train: Car cards & waybills game.
+       v0.13    27jun26   Automation added. Get MFX loco UID. Lower ESP32 frequency when idle to save battery.
 */
 
 // PacoMouseCYD program version
 #define VER_H "0"
-#define VER_L "12"
+#define VER_L "13"
 #define VER_R "b"
 
 
@@ -258,7 +259,7 @@ uint8_t lastLanguage;
 ////////////////////////////////////////////////////////////
 
 enum initResult {INIT_OK, INIT_NO_SD, INIT_NO_WIFI, INIT_NO_CONNECT};
-enum Err {NO_ERROR, ERR_OFF, ERR_STOP, ERR_SERV, ERR_WAIT, ERR_FULL, ERR_CHG_WIFI, ERR_CV, ERR_ASK_SURE, ERR_FILE};
+enum Err {NO_ERROR, ERR_OFF, ERR_STOP, ERR_SERV, ERR_WAIT, ERR_FULL, ERR_CHG_WIFI, ERR_CV, ERR_ASK_SURE, ERR_FILE, ERR_NAME};
 
 byte errType;
 
@@ -382,9 +383,9 @@ uint8_t currAccAspects;
 bool accPanelChanged;
 uint16_t myTurnout;
 
-typedef enum accType {ACC_UNDEF, ACC_TURN_L, ACC_TURN_R, ACC_TRIPLE, ACC_CROSSING, ACC_DCROSS, ACC_BETRELLE, ACC_SIGNAL2, ACC_SIGNAL3, ACC_SIGNAL4, ACC_SEM2, ACC_SEM3,
-                      ACC_PAN, ACC_TT_L, ACC_TT_R, ACC_TT_TRK, ACC_TT_TURN, ACC_LIGHT, ACC_SOUND, ACC_POWER, ACC_KEYPAD, ACC_SWITCH, ACC_MAX,
-                     };
+enum accType {ACC_UNDEF, ACC_TURN_L, ACC_TURN_R, ACC_TRIPLE, ACC_CROSSING, ACC_DCROSS, ACC_BETRELLE, ACC_SIGNAL2, ACC_SIGNAL3, ACC_SIGNAL4, ACC_SEM2, ACC_SEM3,
+              ACC_PAN, ACC_TT_L, ACC_TT_R, ACC_TT_TRK, ACC_TT_TURN, ACC_LIGHT, ACC_SOUND, ACC_POWER, ACC_KEYPAD, ACC_SWITCH, ACC_ROUTE, ACC_MAX,
+             };
 
 typedef struct {
   uint16_t  fncIcon;
@@ -421,6 +422,7 @@ const accObj accDef[ACC_MAX] = {
   { 2, 99, {{FNC_POWER_OFF, COLOR_RED, COLOR_RED},             {FNC_POWER_OFF, COLOR_GREEN, COLOR_GREEN},         {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_POWER
   { 1, 99, {{FNC_KEYPAD_OFF, COLOR_BLACK, COLOR_YELLOW},       {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_KEYPAD
   { 2, 99, {{FNC_SWO_OFF, COLOR_BLACK, COLOR_RED},             {FNC_SWC_OFF, COLOR_BLACK, COLOR_GREEN},           {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SWITCH
+  { 2, 99, {{FNC_ROUTE_OFF, COLOR_BLACK, COLOR_BLUE},          {FNC_ROUTE_RUN_OFF, COLOR_BLACK, COLOR_RED},       {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_ROUTE
 };
 
 typedef struct {
@@ -432,12 +434,77 @@ typedef struct {
   uint16_t  activeOutput;                                   // '3A2G 3A2R 3A1G 3A1R  2A2G 2A2R 2A1G 2A1R  1A2G 1A2R 1A1G 1A1R  0A2G 0A2R 0A1G 0A1R'
 } panelElement;
 
-const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021, 0x4521, 0x0021, 0x0021, 0x0421, 0x8421, 0x0021, 0x0421, 0x0021, 0x0002, 0x0001, 0x0001, 0x0002, 0x0021, 0x0021, 0x0021, 0x0000, 0x0021};
+const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021, 0x4521, 0x0021, 0x0021, 0x0421, 0x8421, 0x0021, 0x0421, 0x0021, 0x0002, 0x0001, 0x0001, 0x0002, 0x0021, 0x0021, 0x0021, 0x0000, 0x0021, 0x0000};
 
 panelElement accPanel[16];
 panelElement currAccEdit;
 uint8_t savedAspect[16][16];
 uint8_t accPosition[256];                                   // Accessories 1..2047 position (0: RED, 1: GREEN)
+
+
+////////////////////////////////////////////////////////////
+// ***** AUTOMATION *****
+////////////////////////////////////////////////////////////
+
+#define AUTOMATION_MAX  50                                  // Max. autosequences availables (divisible by 5)
+#define MAX_AUTO_SEQ    10                                  // Max. autosequences started
+#define AUTO_INTERVAL   100UL                               // Timer interval (100ms) 
+#define AUTO_LOCO_CHG   6                                   // time to wait after loco change to receive status (600ms)
+
+bool editAutomation;
+uint8_t autoIndexStart;
+bool autoFileFound[5];
+char autoName[NAME_LNG + 1];                                // from / to disk
+char autoOpcodes[MAX_LABEL_LNG + 1];
+char autoEditOpcodes[MAX_LABEL_LNG + 1];                    // edit
+uint8_t autoCurrEditing;                                    // current edit automation
+uint16_t autoCurrEditPos;                                   // current opcode editing
+bool addOpcode;
+uint8_t editType;
+uint16_t editValue;
+
+enum autoobj {AUTO_t, AUTO_T, AUTO_z, AUTO_Z, AUTO_L, AUTO_S, AUTO_f, AUTO_F, AUTO_l0, AUTO_l1, AUTO_l2, AUTO_l3, AUTO_D, AUTO_R, AUTO_C, AUTO_r, AUTO_X, AUTO_OBJ_MAX};
+
+typedef struct {
+  char opc;
+  uint16_t defValue;
+  const uint8_t *bitmap;
+  uint16_t color;
+} autoObj;
+
+const autoObj autoDef[AUTO_OBJ_MAX] = {                     // automation default commands
+  {'t', 1, auto_red_sig, COLOR_RED},
+  {'T', 1, auto_green_sig, COLOR_DARKGREEN},
+  {'z', 1, auto_free, COLOR_BLACK},
+  {'Z', 1, auto_busy, COLOR_RED},
+  {'L', 3, auto_loco, COLOR_BLACK},
+  {'S', 0, auto_speed, COLOR_BLACK},
+  {'f', 0, auto_foff, COLOR_BLUE},
+  {'F', 0, auto_fon, COLOR_BLUE},
+  {'l', OBJ_NOT_FOUND, auto_rev, COLOR_RED},
+  {'l', OBJ_NOT_FOUND, auto_fwd, COLOR_BLUE},
+  {'l', OBJ_NOT_FOUND, auto_change, COLOR_BLACK},
+  {'l', OBJ_NOT_FOUND, auto_estop, COLOR_RED},
+  {'D', 10, auto_time, COLOR_MAROON},
+  {'R', 1, auto_jump, COLOR_BLACK},
+  {'C', 1, auto_call, COLOR_BLACK},
+  {'r', OBJ_NOT_FOUND, auto_loop, COLOR_BLACK},
+  {'X', OBJ_NOT_FOUND, auto_end, COLOR_BLACK}
+};
+
+struct autoSeq {
+  uint8_t num;
+  uint16_t currStep;
+  char opcode;
+  uint16_t param;
+  uint16_t value;
+  char opcodes[MAX_LABEL_LNG + 1];
+};
+
+struct autoSeq automation[MAX_AUTO_SEQ];
+
+uint8_t currAutomation;
+uint32_t timerAutomation;
 
 
 ////////////////////////////////////////////////////////////
@@ -728,8 +795,6 @@ byte optLNCV;
 
 char cmd[64];                                               // send buffer
 
-#define NAME_LNG 16                                         // loco names length
-
 #define BUF_LNG 1024
 char inputBuffer[BUF_LNG];
 unsigned int inputLength;
@@ -767,6 +832,8 @@ int numLoks;
 int lastNumValue;
 bool requestedCV;
 int appVer;
+int idS88;
+int stateS88;
 
 byte msgDecodePhase;
 enum {MSG_WAIT, MSG_START, MSG_REPLY, MSG_EVENT, MSG_END, MSG_REPLYBODY, MSG_EVENTBODY};
@@ -837,8 +904,12 @@ const uint8_t FunktionsTastenSymboleCS1[] = {               // Conversion table 
 #define CS2_READ_CFG        0x0E                            // Lok read CV
 #define CS2_WRITE_CFG       0x10                            // Lok write CV
 #define CS2_ACC             0x16                            // Zubehör Schalten
+#define CS2_S88_POLLING     0x20                            // S88 Polling
+#define CS2_S88_EVENT       0x22                            // Rückmelde Event
 #define CS2_PING            0x30                            // Softwarestand Anfrage / Teilnehmer Ping 
 #define CS2_BOOT            0x36                            // Bootloader CAN gebunden, „Service“ 
+#define CS2_CFG_DATA        0x40                            // Anfordern Config Data
+#define CS2_CFG_STREAM      0x42                            // Config Data Stream
 
 #define CS2_SYS_STOP        0x00                            // System Stopp
 #define CS2_SYS_GO          0x01                            // System Go
@@ -866,6 +937,18 @@ enum cs2options {CS2_OPT_BOOT, CS2_OPT_ACC};
 
 uint8_t optionsCS2;
 
+bool ms2New;
+uint16_t loklisteCtr = 0;
+
+enum lokinfoCS2 {LOKINFO_IDLE, LOKINFO_START, LOKINFO_DATA};
+uint8_t lokinfoState;
+uint32_t lokinfoLng, lokinfoTotal;
+char lineStreamCS2[MAX_LABEL_LNG];
+uint16_t streamPosCS2;
+bool uidFound;
+bool isMFX;
+
+#define CS2_PING_INTERVAL 20000UL 
 
 ////////////////////////////////////////////////////////////
 // ***** MAIN PROGRAM *****
@@ -935,6 +1018,7 @@ void loop() {
   timerProcess();
   hidProcess();
   wifiProcess();
+  automationProcess();
   if (isWindow(WIN_STEAM))
     steamProcess();
   if (eventsPending > 0) {                                  // execute pending events
@@ -1031,6 +1115,9 @@ void initVariables() {
   currPanel = 0;
   myTurnout = 1;
   initLastAspects();
+  editAutomation = false;                                   // automation
+  autoIndexStart = 0;
+  initAutomation();
   CVdata    = 3;                                            // CV programming
   CVaddress = 1;
   modeProg = false;
@@ -1068,6 +1155,8 @@ void initVariables() {
   requestedCV = false;
   appVer = 4;
   optionsCS2 = EEPROM.read(EE_CS2);                         // CS2
+  ms2New = true;
+  lokinfoState = LOKINFO_IDLE;
   staTurnoutAdr1 = staGetTurnoutAdr(EE_STA_ADRH1, 1);       // Station Run
   staTurnoutAdr2 = staGetTurnoutAdr(EE_STA_ADRH2, 2);
   staTurnoutAdr3 = staGetTurnoutAdr(EE_STA_ADRH3, 3);

@@ -511,7 +511,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_CATALAN] = "ERROR CV",
     [LANG_GERMAN]  = "CV-FEHLER",
     [LANG_CZECH]   = "CHYBA CV",
-    [LANG_FRENCH]  = "Erreur CV",
+    [LANG_FRENCH]  = "ERREUR CV",
   },
   { // LBL_UTIL_SPEED
     [LANG_ENGLISH] = "Measure speed",
@@ -550,7 +550,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_SPANISH] = "Proximo tren",
     [LANG_CATALAN] = "Proxim tren",
     [LANG_GERMAN]  = "Nachster Zug",
-    [LANG_CZECH]   = "Dalsí vlak",
+    [LANG_CZECH]   = "Dalsi vlak",
     [LANG_FRENCH]  = "Prochain train",
   },
   { // LBL_ASK_SURE
@@ -757,6 +757,9 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_CZECH]   = "Prisl.: MM + DCC",
     [LANG_FRENCH]  = NULL,
   },
+  { // LBL_CS2_UID
+    [LANG_ENGLISH] = "UID",
+  },
   { // LBL_FACTOR
     [LANG_ENGLISH] = "Factor",
     [LANG_SPANISH] = NULL,
@@ -770,7 +773,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_SPANISH] = "Proximo tren",
     [LANG_CATALAN] = "Proxim tren",
     [LANG_GERMAN]  = "Nachster Zug",
-    [LANG_CZECH]   = "Dalsí vlak",
+    [LANG_CZECH]   = "Dalsi vlak",
     [LANG_FRENCH]  = "Prochain train",
   },
   { // LBL_ROUND
@@ -812,5 +815,32 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Nach",
     [LANG_CZECH]   = "Do",
     [LANG_FRENCH]  = "Destination",
+  },
+  { // LBL_ERR_NAME
+    [LANG_ENGLISH] = "Name not\nfound!",
+    [LANG_SPANISH] = "Nombre no\nencontrado!",
+    [LANG_CATALAN] = "Nom no\ntrobat!",
+    [LANG_GERMAN]  = "Name nicht\ngefunden!",
+    [LANG_CZECH]   = "Jmeno\nnenalezeno!",
+    [LANG_FRENCH]  = "Nom\nintrouvable!",
+  },
+  { // LBL_MENU_AUTO
+    [LANG_ENGLISH] = "Automation",
+    [LANG_SPANISH] = "Automatizacion",
+    [LANG_CATALAN] = "Automatitzar",
+    [LANG_GERMAN]  = "Automatisier",
+    [LANG_CZECH]   = "Automatika",
+    [LANG_FRENCH]  = "Automatisation",
+  },
+    { // LBL_AUTOMATION
+    [LANG_ENGLISH] = "Automation",
+    [LANG_SPANISH] = "Automatizacion",
+    [LANG_CATALAN] = "Automatitzar",
+    [LANG_GERMAN]  = "Automatisier",
+    [LANG_CZECH]   = "Automatika",
+    [LANG_FRENCH]  = "Automatisation",
+  },
+      { // LBL_AUTO
+    [LANG_ENGLISH] = "Auto.",
   },
 };

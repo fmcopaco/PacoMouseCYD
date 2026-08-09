@@ -275,8 +275,10 @@ void openWindow(uint16_t id) {
       sprintf (locoEditVmax, "%d", locoData[myLocoData].myVmax);
       lpicData[LPIC_LOK_EDIT].id = locoData[myLocoData].myLocoID;
       scrProt = locoData[myLocoData].myProtocol;
-      if (wifiSetting.protocol == CLIENT_CS2)
+      if (wifiSetting.protocol == CLIENT_CS2) {
         snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
+        buttonData[BUT_CS2_UID].backgnd = (scrProt == LOK_MFX) ? COLOR_CREAM : COLOR_DARKGREY;
+      }
       else
         sprintf (locoEditProt, "DCC");
       for (n = 0; n < 29; n++)
@@ -288,8 +290,10 @@ void openWindow(uint16_t id) {
       createObject(OBJ_LABEL, LBL_NAME);
       createObject(OBJ_LABEL, LBL_VMAX);
       createObject(OBJ_TXT, TXT_EDIT_ADDR);
-      if (wifiSetting.protocol == CLIENT_CS2)
+      if (wifiSetting.protocol == CLIENT_CS2) {
         createObject(OBJ_TXT, TXT_EDIT_PROT);
+        createObject(OBJ_BUTTON, BUT_CS2_UID);
+      }
       createObject(OBJ_TXT, TXT_EDIT_NAME);
       createObject(OBJ_TXT, TXT_EDIT_IMAGE);
       createObject(OBJ_TXT, TXT_EDIT_VMAX);
@@ -393,6 +397,8 @@ void openWindow(uint16_t id) {
       createObject(OBJ_BUTTON, BUT_MENU_T_CFG);
       createObject(OBJ_BUTTON, BUT_MENU_I_UTILS);
       createObject(OBJ_BUTTON, BUT_MENU_T_UTILS);
+      createObject(OBJ_BUTTON, BUT_MENU_I_AUTO);
+      createObject(OBJ_BUTTON, BUT_MENU_T_AUTO);
       createObject(OBJ_DRAWSTR, DSTR_MENU);
       newEvent(OBJ_WIN, WIN_MENU, EVNT_DRAW);
       break;
@@ -1055,6 +1061,85 @@ void openWindow(uint16_t id) {
       createObject(OBJ_BUTTON, BUT_OPER_CNCL);
       newEvent(OBJ_WIN, WIN_NXT_EVENT, EVNT_DRAW);
       break;
+    case WIN_AUTOMATION:
+      autoShowItems();
+      createObject(OBJ_WIN, WIN_AUTOMATION);
+      createObject(OBJ_LABEL, LBL_AUTOMATION);
+      createObject(OBJ_DRAWSTR, DSTR_AUTO);
+      createObject(OBJ_FNC, FNC_AUTO0);
+      createObject(OBJ_FNC, FNC_AUTO1);
+      createObject(OBJ_FNC, FNC_AUTO2);
+      createObject(OBJ_FNC, FNC_AUTO3);
+      createObject(OBJ_FNC, FNC_AUTO4);
+      createObject(OBJ_TXT, TXT_AUTO_NUM0);
+      createObject(OBJ_TXT, TXT_AUTO_NUM1);
+      createObject(OBJ_TXT, TXT_AUTO_NUM2);
+      createObject(OBJ_TXT, TXT_AUTO_NUM3);
+      createObject(OBJ_TXT, TXT_AUTO_NUM4);
+      createObject(OBJ_TXT, TXT_AUTO_NAME0);
+      createObject(OBJ_TXT, TXT_AUTO_NAME1);
+      createObject(OBJ_TXT, TXT_AUTO_NAME2);
+      createObject(OBJ_TXT, TXT_AUTO_NAME3);
+      createObject(OBJ_TXT, TXT_AUTO_NAME4);
+      createObject(OBJ_ICON, ICON_PREV_AUTO);
+      createObject(OBJ_ICON, ICON_NEXT_AUTO);
+      createObject(OBJ_ICON, ICON_EDIT_AUTO);
+      createObject(OBJ_BUTTON, BUT_AUTO_CNCL);
+      newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+      break;
+    case WIN_AUTO_EDIT:
+      createObject(OBJ_WIN, WIN_AUTO_EDIT);
+      createObject(OBJ_BUTTON, BUT_AUTO_OPC0);
+      createObject(OBJ_BUTTON, BUT_AUTO_OPC1);
+      createObject(OBJ_BUTTON, BUT_AUTO_OPC2);
+      createObject(OBJ_BUTTON, BUT_AUTO_OPC3);
+      createObject(OBJ_BUTTON, BUT_AUTO_OPC4);
+      createObject(OBJ_BUTTON, BUT_AUTO_EDIT_ADD);
+      createObject(OBJ_BUTTON, BUT_AUTO_EDIT_DEL);
+      createObject(OBJ_BUTTON, BUT_AUTO_EDIT_SAVE);
+      createObject(OBJ_BUTTON, BUT_AUTO_EDIT_CNCL);
+      createObject(OBJ_TXT, TXT_AUTO_OPC0);
+      createObject(OBJ_TXT, TXT_AUTO_OPC1);
+      createObject(OBJ_TXT, TXT_AUTO_OPC2);
+      createObject(OBJ_TXT, TXT_AUTO_OPC3);
+      createObject(OBJ_TXT, TXT_AUTO_OPC4);
+      createObject(OBJ_TXT, TXT_AUTO_EDIT_NAME);
+      createObject(OBJ_TXT, TXT_AUTO_CNT);
+      newEvent(OBJ_WIN, WIN_AUTO_EDIT, EVNT_DRAW);
+      break;
+    case WIN_AUTO_NAME:
+      snprintf(keybNameBuf, NAME_LNG + 1, autoNameEditBuf);
+      txtData[TXT_NAME].maxLength = NAME_LNG;
+      createObject(OBJ_WIN, WIN_AUTO_NAME);
+      createObject(OBJ_TXT, TXT_NAME);
+      createObject(OBJ_KEYBOARD, KEYB_NAME);
+      createObject(OBJ_BUTTON, BUT_NAME_OK);
+      createObject(OBJ_BUTTON, BUT_NAME_CNCL);
+      newEvent(OBJ_WIN, WIN_AUTO_NAME, EVNT_DRAW);
+      break;
+    case WIN_AUTO_ADD:
+      createObject(OBJ_WIN, WIN_AUTO_ADD);
+      createObject(OBJ_KEYBOARD, KEYB_AUTO);
+      createObject(OBJ_TXT, TXT_AUTO_ADD);
+      createObject(OBJ_TXT, TXT_AUTO_CONV);
+      createObject(OBJ_BUTTON, BUT_AUTO_ADD);
+      newEvent(OBJ_WIN, WIN_AUTO_ADD, EVNT_DRAW);
+      break;
+    case WIN_ROUTE_EDIT:
+      winData[WIN_ACC_EDIT].h = 130;
+      buttonData[BUT_TYPE_OK].y = 93;
+      buttonData[BUT_TYPE_CNCL].y = 93;
+      iconData[ICON_TYPE_OK].y = 97;
+      iconData[ICON_TYPE_CNCL].y = 97;
+      createObject(OBJ_WIN, WIN_ROUTE_EDIT);
+      createObject(OBJ_LABEL, LBL_ACC_NAME);
+      createObject(OBJ_LABEL, LBL_AUTO);
+      createObject(OBJ_TXT, TXT_ACC_NAME);
+      createObject(OBJ_TXT, TXT_ACC_ADDR1);
+      createObject(OBJ_BUTTON, BUT_TYPE_OK);
+      createObject(OBJ_BUTTON, BUT_TYPE_CNCL);
+      newEvent(OBJ_WIN, WIN_ROUTE_EDIT, EVNT_DRAW);
+      break;
   }
 }
 
@@ -1102,6 +1187,11 @@ void alertWindow(byte err) {
       createObject(OBJ_ICON, ICON_WARNING);
       createObject(OBJ_ICON, ICON_WARNING_ON);
       createObject(OBJ_LABEL, LBL_NOT_FOUND);
+      break;
+    case ERR_NAME:
+      createObject(OBJ_ICON, ICON_WARNING);
+      createObject(OBJ_ICON, ICON_WARNING_ON);
+      createObject(OBJ_LABEL, LBL_ERR_NAME);
       break;
   }
   newEvent(OBJ_WIN, WIN_ALERT, EVNT_DRAW);

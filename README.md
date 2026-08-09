@@ -17,6 +17,7 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
   * Definition of actions for buttons
   * Control of accesories with 2, 3 or 4 aspects.
   * Multiple panels of accessories.
+  * Automation
   * CV and LNCV programming
   * Identify the name of the most common manufacturers when reading the CV8.
   * Locking of some features for guest or club use.

@@ -360,6 +360,21 @@ void writeCVXnet (unsigned int adr, unsigned int data, byte stepPrg) {
 }
 
 
+void infoAccessoryXnet (byte modulo, bool nibble) {               // Accessory Decoder information request  (0x42,ADR,NIBBLE,XOR)
+  headerXN (0x42);
+  dataXN (modulo);
+  if (nibble)
+    dataXN (0x81);
+  else
+    dataXN (0x80);
+  sendXN();
+}
+
+void queryFeedbackXnet(uint16_t fbk) {
+  infoAccessoryXnet(fbk >> 3, ((fbk & 0x07) > 3) ? true : false);
+}
+
+
 ////////////////////////////////////////////////////////////
 // ***** XPRESSNET LAN DECODE *****
 ////////////////////////////////////////////////////////////
@@ -638,7 +653,20 @@ void procesaXN () {
               accessoryChange(adr + 1, true);
           }
           else {                                            // RS Feedback
-
+            for (n = 0; n < MAX_AUTO_SEQ; n++) {
+              if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+                if (modulo == (automation[n].param >> 3)) {
+                  if (dato & 0x10) {                        // high nibble
+                    if (automation[n].param & 0x04)
+                      automation[n].value = bitRead(dato, automation[n].param & 0x03);
+                  }
+                  else {                                    // low nibble
+                    if (! (automation[n].param & 0x04))
+                      automation[n].value = bitRead(dato, automation[n].param & 0x03);
+                  }
+                }
+              }
+            }
           }
         }
       }

@@ -48,8 +48,10 @@ void setRotationDisplay(uint8_t pos) {                            // Rotate disp
 
 void aliveAndKicking() {
   setTimer (TMR_BLIGHT, INACT_TIME, TMR_ONESHOT);                 // reset timeout and restore backlight
-  if (currBacklight != backlight)
+  if (currBacklight != backlight) {
+    setCpuFrequencyMhz(240);                                      // restore CPU frequency to 240MHz
     setBacklight(backlight);
+  }
 }
 
 
@@ -173,9 +175,8 @@ initResult initSequence() {                                       // Performs in
   drawObject(OBJ_ICON, ICON_WIFI);                                // connecting to WiFi network
   drawObject(OBJ_DRAWSTR, DSTR_INIT_STAT);
   drawObject(OBJ_LABEL, LBL_CONNECT);
-  getLabelTxt(LBL_PACO_TXT, label);
-  WiFi.setHostname(label);
   WiFi.mode(WIFI_STA);
+  WiFi.setHostname(translations[LBL_PACO_TXT][LANG_ENGLISH]);
   WiFi.begin(wifiSetting.ssid, wifiSetting.password);
   n = 0;
   while ((WiFi.status() != WL_CONNECTED) && n < 80) {             // tries to connect to router in 20 seconds
@@ -207,7 +208,7 @@ initResult initSequence() {                                       // Performs in
         getStatusZ21();                                           // every x seconds
         getSerialNumber();
         delay(500);
-        setBroadcastFlags (0x00000013);                           // Broadcasts and info messages concerning driving and switching, report changes on feedback bus & fast clock
+        setBroadcastFlags (0x08000013);                           // Broadcasts and info messages concerning driving and switching, report changes on feedback bus & fast clock
         getStatusZ21();
         //askZ21begin (LAN_GET_BROADCASTFLAGS);
         //sendUDP (0x04);
@@ -289,6 +290,7 @@ initResult initSequence() {                                       // Performs in
   setTimer (TMR_END_LOGO, 7, TMR_ONESHOT);                        // Wait for answer
   setTimer (TMR_WIFI_CHK, 50, TMR_PERIODIC);                      // Check for connection every 5s
   readBattLevel();
+  aliveAndKicking();
   return result;
 }
 
@@ -932,6 +934,26 @@ void exitProgramming() {
       // CS2  not defined
   }
 }
+
+
+void queryFeedback(uint16_t fbk) {
+  switch (wifiSetting.protocol) {
+    case CLIENT_Z21:
+      queryFeedbackZ21(fbk);
+      break;
+    case CLIENT_XNET:
+      queryFeedbackXnet(fbk);
+      break;
+    case CLIENT_ECOS:
+      queryFeedbackECoS(fbk);
+      break;
+    case CLIENT_CS2:
+      queryFeedbackCS2(fbk);
+      break;
+      // LNET not defined
+  }
+}
+
 
 ////////////////////////////////////////////////////////////
 // ***** CV PROGRAMMING *****

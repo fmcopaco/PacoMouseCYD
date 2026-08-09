@@ -214,6 +214,16 @@ void exitProgrammingECoS() {
   }
 }
 
+
+void getInfoS88 (unsigned int id) {
+  snprintf(cmd, 64, "get(%d, state)\n", id);                            // Ask current state of the S88 module.
+  sendMsgECOS(cmd);
+}
+
+void queryFeedbackECoS(uint16_t fbk) {
+  getInfoS88(100 + (fbk >> 4));
+}
+
 ////////////////////////////////////////////////////////////
 // ***** ECoS DECODE *****
 ////////////////////////////////////////////////////////////
@@ -680,12 +690,10 @@ bool ECoSDecode() {
                     decodeReplyLoco();
                 }
                 else {
-                  /*
-                    if ((idManager >= ID_S88FEEDBACK) && (idManager < (ID_S88FEEDBACK + 32)))           // S88 events
-                      decodeEventS88Feedback();
-                    else
-                  */
-                  discardLine();
+                  if ((idManager >= ID_S88FEEDBACK) && (idManager < (ID_S88FEEDBACK + 32)))           // S88 events
+                    decodeEventS88Feedback();
+                  else
+                    discardLine();
                 }
                 break;
             }
@@ -720,10 +728,8 @@ bool ECoSDecode() {
                   discardLine();
                 break;
               default:
-                /*
-                  if ((idManager >= ID_S88FEEDBACK) && (idManager < (ID_S88FEEDBACK + 32)))
-                    decodeEventS88Feedback();
-                */
+                if ((idManager >= ID_S88FEEDBACK) && (idManager < (ID_S88FEEDBACK + 32)))
+                  decodeEventS88Feedback();
                 if (idManager == locoData[myLocoData].myLocoID)
                   decodeReplyLoco();                                      // decodes answer to: get(1xxx,...)  / set..
                 else
@@ -795,6 +801,29 @@ void decodeEventCV() {
 }
 
 
+void decodeEventS88Feedback() {
+  idS88 = T.intvalue - 100;                                                // 100 state[0x400]
+  scan(&T);
+  if (T.token == T_STATE) {                                               // state
+    scan(&T);                                                             // [
+    scan(&T);                                                             // 0
+    scan(&T);                                                             // hex value: x400
+    if (T.token == T_IDENT) {
+      if (ident2HEX(Text, &stateS88)) {
+        for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
+          if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+            if (idS88 == (automation[n].param >> 4))
+              automation[n].value = bitRead(stateS88, automation[n].param & 0x0F);
+          }
+        }
+      }
+      DEBUG_MSG("S88 ID: %d State: %s - %04X", idS88, Text, stateS88);
+    }
+    else {
+      DEBUG_MSG("Error HEX conversion");
+    }
+  }
+}
 
 void parseLokAddrName(int pos) {
   scan(&T);                                                               // 1003 addr[78] name["W. K"]

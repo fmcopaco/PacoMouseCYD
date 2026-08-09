@@ -342,10 +342,15 @@ void setAccessoryZ21 (unsigned int FAdr, int pair, bool active) {
 }
 
 
-void getFeedbackInfo (byte group) {
+void getFeedbackInfo (byte group) {                           // Poll the current status of the feedback modules
   askZ21begin (LAN_RMBUS_GETDATA);
   askZ21data (group);
   sendUDP (0x05);
+}
+
+void queryFeedbackZ21(uint16_t fbk) {
+  if (fbk < 160)
+    getFeedbackInfo ((fbk > 79) ? 1 : 0);
 }
 
 
@@ -397,19 +402,20 @@ void DecodeZ21 (int len, byte * packet) {                     // decode z21 UDP 
     case LAN_GET_TURNOUTMODE:
       break;
     case LAN_RMBUS_DATACHANGED:
-      /*
-        #ifdef USE_AUTOMATION
-        for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
-          if ((automation[n].opcode & OPC_AUTO_MASK) == OPC_AUTO_FBK) {
-            if ((packet[4] == 0x01) && (automation[n].param > 9))
-              automation[n].value = packet[automation[n].param - 5];
-            if ((packet[4] == 0x00) && (automation[n].param < 10))
-              automation[n].value = packet[automation[n].param + 5];
-            DEBUG_MSG("RBUS %d", automation[n].value)
+      for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
+        if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+          if (automation[n].param < 160) {
+            if ((packet[4] == 0x01) && (automation[n].param > 79)) {
+              group = ((automation[n].param - 80) >> 3) & 0x0F;
+              automation[n].value = bitRead (packet[5 + group], automation[n].param & 0x07);
+            }
+            if ((packet[4] == 0x00) && (automation[n].param < 80)) {
+              group = (automation[n].param >> 3) & 0x0F;
+              automation[n].value = bitRead (packet[5 + group], automation[n].param & 0x07);
+            }
           }
         }
-        #endif
-      */
+      }
       break;
     case LAN_SYSTEMSTATE_DATACHANGED:
       csStatus = packet[16] & (csEmergencyStop | csTrackVoltageOff | csProgrammingModeActive);    // CentralState
@@ -434,6 +440,15 @@ void DecodeZ21 (int len, byte * packet) {                     // decode z21 UDP 
       }
       break;
     case LAN_LOCONET_DETECTOR:
+      if (packet[4] == 0x01) {                                // type OPC_INPUT_REP, X=1
+        for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
+          if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+            FAdr = (packet[6] << 8) + packet[5] + 1;
+            if (FAdr == automation[n].param)
+              automation[n].value = packet[7];
+          }
+        }
+      }
       break;
     case LAN_FAST_CLOCK_DATA:                                 // fast clock data FW 1.43
       if (packet[8] & 0x80) {                                 // Stop flag

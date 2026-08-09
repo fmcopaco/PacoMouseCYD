@@ -169,6 +169,16 @@ void controlEncoder() {                                           // encoder mov
       fncData[FNC_ACC_TYPE].colorOn = accDef[encoderValue].icon[0].colorOn;
       drawObject(OBJ_FNC, FNC_ACC_TYPE);
       break;
+    case WIN_AUTO_EDIT:
+      populateOpcodeList();
+      updateOpcodeList();
+      break;
+    case WIN_AUTO_ADD:
+      showOpcodeEdit(encoderValue, autoDef[encoderValue].defValue);
+      newEvent(OBJ_BUTTON, BUT_AUTO_ADD, EVNT_DRAW);
+      newEvent(OBJ_TXT, TXT_AUTO_ADD, EVNT_DRAW);
+      newEvent(OBJ_TXT, TXT_AUTO_CONV, EVNT_DRAW);
+      break;
   }
 }
 
@@ -267,6 +277,12 @@ void controlSwitch() {                                            // encoder swi
       break;
     case WIN_ACC_TYPE:
       accTypeClick();
+      break;
+    case WIN_AUTO_EDIT:
+      if (editType != AUTO_X) {
+        setEditOpcode(false);
+        openWindow(WIN_AUTO_ADD);
+      }
       break;
   }
 }

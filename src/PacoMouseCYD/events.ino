@@ -16,7 +16,8 @@ void eventProcess() {
       DEBUG_MSG("Timer event");
       switch (event.objID) {
         case TMR_BLIGHT:
-          setBacklight(SYS_MIN_BL);
+          setCpuFrequencyMhz(80);                                           // set CPU frequency to 80MHz to save battery
+          setBacklight(SYS_MIN_BL);                                         // set backlight to minimum
           break;
         case TMR_END_LOGO:
           closeWindow(WIN_LOGO);
@@ -33,7 +34,7 @@ void eventProcess() {
               //infoLocomotora(locoData[myLocoData].myAddr.address);
               break;
           }
-          actionSW_BOOT = getActionOption(EE_ACT_BOOT);                      // set button action
+          actionSW_BOOT = getActionOption(EE_ACT_BOOT);                     // set button action
           actionSW_R = getActionOption(EE_ACT_R);
           actionSW_G = getActionOption(EE_ACT_G);
           actionSW_B = getActionOption(EE_ACT_B);
@@ -213,6 +214,7 @@ void eventProcess() {
                 case ERR_FULL:
                 case ERR_CHG_WIFI:
                 case ERR_FILE:
+                case ERR_NAME:
                   closeWindow(WIN_ALERT);
                   break;
                 case ERR_STOP:
@@ -426,6 +428,8 @@ void eventProcess() {
                 closeWindow(WIN_ACC_NAME);
               if (isWindow(WIN_PANEL_NAME))
                 closeWindow(WIN_PANEL_NAME);
+              if (isWindow(WIN_AUTO_NAME))
+                closeWindow(WIN_AUTO_NAME);
               break;
             case BUT_NAME_OK:
               if (isWindow(WIN_EDIT_NAME)) {
@@ -445,6 +449,10 @@ void eventProcess() {
                 else
                   saveAccPanelNames(LittleFS);
                 closeWindow(WIN_PANEL_NAME);
+              }
+              if (isWindow(WIN_AUTO_NAME)) {
+                snprintf(autoNameEditBuf, NAME_LNG + 1, keybNameBuf);
+                closeWindow(WIN_AUTO_NAME);
               }
               break;
             case BUT_EDIT_FUNC:
@@ -498,6 +506,12 @@ void eventProcess() {
             case BUT_MENU_T_UTILS:
               closeWindow(WIN_MENU);
               openWindow(WIN_UTIL);
+              break;
+            case BUT_MENU_I_AUTO:
+            case BUT_MENU_T_AUTO:
+              if (isWindow(WIN_MENU))
+                closeWindow(WIN_MENU);
+              openWindow(WIN_AUTOMATION);
               break;
             case BUT_CFG_I_LANG:
             case BUT_CFG_T_LANG:
@@ -686,6 +700,15 @@ void eventProcess() {
                 closeWindow(WIN_PLAY_NEXT);
                 openWindow(WIN_NXT_POINTS);
               }
+              if (isWindow(WIN_AUTOMATION)) {
+                txtID = autoIndexStart + paramChild + 1;         // delete automation file
+                autoDeleteFile(txtID);
+              }
+              if (isWindow(WIN_AUTO_EDIT)) {
+                deleteOpcode();
+                autoSetEncoder(autoCurrEditPos);
+                populateOpcodeList();
+              }
               break;
             case BUT_CV_LNCV:
               artNum = 0;
@@ -752,10 +775,12 @@ void eventProcess() {
               updateAccChange();
               updateSpeedHID();
               closeWindow(WIN_ACC_EDIT);
+              closeWindow(WIN_ROUTE_EDIT);
               break;
             case BUT_TYPE_CNCL:
               updateSpeedHID();
               closeWindow(WIN_ACC_EDIT);
+              closeWindow(WIN_ROUTE_EDIT);
               break;
             case BUT_ACC_OUT0:
             case BUT_ACC_OUT1:
@@ -1008,6 +1033,53 @@ void eventProcess() {
               checkEndOrder();
               getEventCard();
               break;
+            case BUT_CS2_UID:
+              if (scrProt == LOK_MFX) {
+                lokinfoState = LOKINFO_START;
+                getLokinfoCS2();
+                buttonData[BUT_CS2_UID].backgnd = COLOR_PINK;
+                newEvent(OBJ_BUTTON, BUT_CS2_UID, EVNT_DRAW);
+              }
+              break;
+            case BUT_AUTO_CNCL:
+              editAutomation = false;
+              closeWindow(WIN_AUTOMATION);
+              break;
+            case BUT_AUTO_EDIT_CNCL:
+              updateSpeedHID();                 // set encoder
+              closeWindow(WIN_AUTO_EDIT);
+              break;
+            case BUT_AUTO_EDIT_DEL:
+              alertWindow(ERR_ASK_SURE);
+              break;
+            case BUT_AUTO_EDIT_SAVE:
+              autoSaveFile();
+              autoShowItems();                  // update list
+              updateSpeedHID();                 // set encoder
+              closeWindow(WIN_AUTO_EDIT);
+              break;
+            case BUT_AUTO_EDIT_ADD:
+              setEditOpcode(true);
+              openWindow(WIN_AUTO_ADD);
+              break;
+            case BUT_AUTO_OPC0:
+              if (encoderValue > 0) {
+                encoderValue--;
+                populateOpcodeList();
+                updateOpcodeList();
+              }
+              break;
+            case BUT_AUTO_OPC1:
+            case BUT_AUTO_OPC2:
+            case BUT_AUTO_OPC3:
+            case BUT_AUTO_OPC4:
+              txtID = event.objID - BUT_AUTO_OPC1;
+              if ((encoderValue + txtID) < encoderMax) {
+                encoderValue = encoderValue + txtID + 1;
+                populateOpcodeList();
+                updateOpcodeList();
+              }
+              break;
           }
           break;
         case OBJ_ICON:
@@ -1133,6 +1205,25 @@ void eventProcess() {
                 currOperPoint++;
               updateDestPoint();
               break;
+            case ICON_EDIT_AUTO:
+              editAutomation = !editAutomation;
+              autoShowItems();
+              newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+              break;
+            case ICON_NEXT_AUTO:
+              autoIndexStart += 5;
+              if (autoIndexStart >= AUTOMATION_MAX)
+                autoIndexStart = 0;
+              autoShowItems ();
+              newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+              break;
+            case ICON_PREV_AUTO:
+              if (autoIndexStart == 0)
+                autoIndexStart = AUTOMATION_MAX;
+              autoIndexStart -= 5;
+              autoShowItems ();
+              newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+              break;
           }
           break;
         case OBJ_FNC:
@@ -1212,7 +1303,7 @@ void eventProcess() {
                 startTenderFill();
               break;
             case FNC_ST_WHISTLE:
-              toggleFunction(2, FNC_ST_WHISTLE);                           // Function F2
+              toggleFunction(2, FNC_ST_WHISTLE);                          // Function F2
               break;
             case FNC_ACC_TYPE:
               accTypeClick();
@@ -1241,10 +1332,36 @@ void eventProcess() {
             case FNC_NXT_POINT:
               openWindow(WIN_OPER_POINT);
               break;
+            case FNC_AUTO0:
+            case FNC_AUTO1:
+            case FNC_AUTO2:
+            case FNC_AUTO3:
+            case FNC_AUTO4:
+              paramChild = event.objID - FNC_AUTO0;
+              if (editAutomation) {                                       // Edit: Add or Delete
+                if (autoFileFound[paramChild]) {
+                  alertWindow(ERR_ASK_SURE);                              // delete
+                }
+                else {
+                  autoCurrEditing = autoIndexStart + paramChild + 1;      // add
+                  autoNewItem();
+                  autoSetEncoder(0);
+                  populateOpcodeList();
+                  openWindow(WIN_AUTO_EDIT);
+                }
+              }
+              else {                                                      // Run or Stop automation
+                txtID = paramChild + autoIndexStart + 1;
+                if (findAutomation(txtID) != MAX_AUTO_SEQ)
+                  stopAutomation(txtID);
+                else
+                  startAutomation(txtID);
+              }
+              break;
           }
           break;
         case OBJ_TXT:
-          DEBUG_MSG("Textbox click")
+          //DEBUG_MSG("Textbox click")
           txtID = 0;
           switch (event.objID) {
             case TXT_SSID6:
@@ -1320,7 +1437,9 @@ void eventProcess() {
               if (scrProt == LOK_SX1)
                 scrProt = LOK_DCC;
               snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
+              buttonData[BUT_CS2_UID].backgnd = (scrProt == LOK_MFX) ? COLOR_CREAM : COLOR_DARKGREY;
               newEvent(OBJ_TXT, TXT_EDIT_PROT, EVNT_DRAW);
+              newEvent(OBJ_BUTTON, BUT_CS2_UID, EVNT_DRAW);
               break;
             case TXT_SEL_ADDR6:
             case TXT_SEL_NAME6:
@@ -1452,6 +1571,30 @@ void eventProcess() {
             case TXT_NXT_DEST2:
             case TXT_NXT_DEST3:
               takeOrder(event.objID - TXT_NXT_DEST0);
+              break;
+            case TXT_AUTO_EDIT_NAME:
+              openWindow(WIN_AUTO_NAME);
+              break;
+            case TXT_AUTO_NAME0:
+            case TXT_AUTO_NAME1:
+            case TXT_AUTO_NAME2:
+            case TXT_AUTO_NAME3:
+            case TXT_AUTO_NAME4:
+              txtID = event.objID - TXT_AUTO_NAME0;
+              if (autoFileFound[txtID]) {                                   // only if file exist
+                if (editAutomation) {
+                  autoCurrEditing = autoIndexStart + txtID + 1;             // edit
+                  getAutomation();
+                  openWindow(WIN_AUTO_EDIT);
+                }
+                else {                                                      // run
+                  txtID = txtID + autoIndexStart + 1;
+                  if (findAutomation(txtID) != MAX_AUTO_SEQ)
+                    stopAutomation(txtID);
+                  else
+                    startAutomation(txtID);
+                }
+              }
               break;
           }
           break;
@@ -1607,6 +1750,11 @@ void eventProcess() {
                   case KEYB_CV_ADDR:
                   case KEYB_ACC:
                     txtData[txtID].buf[0] = '\0';
+                    break;
+                  case KEYB_AUTO:
+                    txtData[txtID].buf[0] = '\0';
+                    showConvertValue(autoDef[encoderValue].opc, atoi(autoAddBuf)); // show converted value
+                    newEvent(OBJ_TXT, TXT_AUTO_CONV, EVNT_DRAW);
                     break;
                 }
               }
@@ -1808,6 +1956,12 @@ void eventProcess() {
                   eepromChanged = true;
                   closeWindow(WIN_STA_KEYB);
                   break;
+                case KEYB_AUTO:
+                  addEditOpcode();
+                  autoSetEncoder(autoCurrEditPos);
+                  populateOpcodeList();
+                  closeWindow(WIN_AUTO_ADD);
+                  break;
               }
               break;
             case ',':
@@ -1851,6 +2005,10 @@ void eventProcess() {
                           break;
                       }
                       break;
+                    case KEYB_AUTO:
+                      showConvertValue(autoDef[encoderValue].opc, atoi(autoAddBuf)); // show converted value
+                      newEvent(OBJ_TXT, TXT_AUTO_CONV, EVNT_DRAW);
+                      break;
                   }
                 }
               }
@@ -1864,8 +2022,17 @@ void eventProcess() {
                 openWindow(WIN_SEL_LOCO);
               break;
             case LPIC_LOK_EDIT:
-              if (wifiSetting.protocol != CLIENT_ECOS)
-                openWindow(WIN_SEL_IMAGE);
+              switch (wifiSetting.protocol) {
+                case CLIENT_ECOS:
+                  break;
+                case CLIENT_CS2:
+                  if (scrProt != LOK_MFX)
+                    openWindow(WIN_SEL_IMAGE);
+                  break;
+                default:
+                  openWindow(WIN_SEL_IMAGE);
+                  break;
+              }
               break;
             case LPIC_SEL_IMG1:
             case LPIC_SEL_IMG2:

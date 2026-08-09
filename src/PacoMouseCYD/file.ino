@@ -512,7 +512,88 @@ void loadGameEvent(uint8_t game, uint8_t event) {
   }
 }
 
-/*
+
+bool saveAutomation(fs::FS & fs, uint8_t num) {
+  char field[30];
+  uint16_t cnt;
+  bool dataOK, isDir;
+  File myFile;
+  dataOK = false;
+  myFile = fs.open("/acc");
+  if (myFile) {
+    isDir = myFile.isDirectory();
+    myFile.close();
+    if (!isDir)
+      return dataOK;
+    DEBUG_MSG("/acc is a directory");
+  }
+  else {
+    DEBUG_MSG("Directory /acc not found. Creating...")
+    fs.mkdir("/acc");
+  }
+  sprintf (field, "/acc/FS%d.csv", num);
+  myFile = fs.open(field, FILE_WRITE);
+  if (myFile) {
+    DEBUG_MSG("File %s opened for writting", field);
+    getLabelTxt(LBL_NAME, field);                         // Header
+    myFile.print(field);
+    myFile.print(CSV_FILE_DELIMITER);
+    getLabelTxt(LBL_AUTOMATION, field);
+    myFile.print(field);
+    myFile.print("\r\n");
+    myFile.print(autoName);
+    myFile.print(CSV_FILE_DELIMITER);
+    myFile.print(autoOpcodes);
+    myFile.print("\r\n");
+    myFile.close();
+    dataOK = true;
+  }
+  return dataOK;
+}
+
+
+
+bool loadAutomation(fs::FS & fs, uint8_t num) {
+  char line[200];
+  bool dataOK;
+  uint16_t n;
+  File myFile;
+  dataOK = false;
+  sprintf (line, "/acc/FS%d.csv", num);
+  myFile = fs.open(line);
+  if (myFile) {
+    if (readCSV(myFile, line, sizeof(line), false)) {                                     // skip header line
+      if (readCSV(myFile, autoName, sizeof(autoName), true)) {                            // read data field: Name
+        DEBUG_MSG("%s", autoName)
+        if (readCSV(myFile, autoOpcodes, sizeof(autoOpcodes), true)) {                    // read data field: Automation
+          DEBUG_MSG("%s", autoOpcodes)
+          dataOK = true;
+        }
+      }
+    }
+    myFile.close();
+  }
+  return dataOK;
+}
+
+
+bool deleteAutomation (fs::FS &fs, uint8_t num) {
+  char line[200];
+  bool dataOK;
+  dataOK = false;
+  sprintf (line, "/acc/FS%d.csv", num);
+  if (fs.remove(line)) {
+    DEBUG_MSG("File %s deleted", line);
+    dataOK = true;
+  }
+  else {
+    DEBUG_MSG("File %s delete failed", line);
+  }
+  return dataOK;
+}
+
+
+
 #ifdef SCREEN_SEND
 
 // In User_Setup.h set max. 5MHz as read frequency: SPI_READ_FREQUENCY   5000000
@@ -608,7 +689,7 @@ void screenServer() {
 }
 
 #endif
-*/
+
 /*
   void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
   Serial.printf("Listing directory: %s\n", dirname);

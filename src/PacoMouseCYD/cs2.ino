@@ -85,6 +85,10 @@ void processCS2() {
         DecodeCS2();                                                      // decode received packet
     }
   }
+  if (millis() - pingTimer > CS2_PING_INTERVAL) {                         // Refresh to maintain connection
+    pingTimer = millis();
+    pingCS2();
+  }
 }
 
 
@@ -174,7 +178,17 @@ void newMsgCS2 (uint8_t cmd, uint8_t dlc, uint16_t uid) {
 }
 
 uint16_t getAddrCS2(uint16_t loco, uint8_t prot) {
-  loco = (prot < LOK_PROT_MAX) ? (loco | baseLokProt[prot]) : (loco | CS2_DCC);
+  switch (prot) {
+    case LOK_MFX:
+      loco = (locoData[myLocoData].myLocoID & 0x3FFF) | CS2_MFX;
+      break;
+    case LOK_MM:
+      loco = loco | CS2_MM;
+      break;
+    default:
+      loco = loco | CS2_DCC;
+      break;
+  }
   return loco;
 }
 
@@ -250,10 +264,10 @@ void setAccessoryCS2(unsigned int FAdr, int pair, bool activate)  {
 
 bool isMyLocoCS2() {
   uint16_t loco;
-  if ((OutData[CS2_DATA0] > 0) || (OutData[CS2_DATA1] > 0))
+  if ((packetBuffer[CS2_DATA0] > 0) || (packetBuffer[CS2_DATA1] > 0))
     return false;
   loco = getMyAddrCS2();
-  return ((OutData[CS2_DATA2] == highByte(loco)) && (OutData[CS2_DATA3] == lowByte(loco)));
+  return ((packetBuffer[CS2_DATA2] == highByte(loco)) && (packetBuffer[CS2_DATA3] == lowByte(loco)));
 }
 
 void setTimeCS2(byte hh, byte mm, byte rate) {                            // undocumented
@@ -294,6 +308,148 @@ void writeCVCS2 (unsigned int adr, unsigned int data, byte stepPrg) {
   progStepCV = stepPrg;
 }
 
+void queryFeedbackCS2(uint16_t fbk) {
+  newMsgCS2 (CS2_S88_EVENT, 4, fbk);
+  sendDataCS2();
+}
+
+/*
+  void getLokNameCS2 (uint16_t ctr, uint16_t cnt) {                         // get 'loknamen' stream, cnt: MS2 search 2 locomotives at time, ctr: 0... numloks .wert
+  char folgeInfo[9];
+  int lng, n;
+  newMsgCS2 (CS2_CFG_DATA, 8, 0);
+  OutData[CS2_DATA0] = 'l';
+  OutData[CS2_DATA1] = 'o';
+  OutData[CS2_DATA2] = 'k';
+  if (ms2New) {
+    OutData[CS2_DATA3] = 'l';                                             // MS2 v3.x
+    OutData[CS2_DATA4] = 'i';
+    OutData[CS2_DATA5] = 's';
+    OutData[CS2_DATA6] = 't';
+    OutData[CS2_DATA7] = 'e';
+  }
+  else {
+    OutData[CS2_DATA3] = 'n';                                             // MS2 v2.x
+    OutData[CS2_DATA4] = 'a';
+    OutData[CS2_DATA5] = 'm';
+    OutData[CS2_DATA6] = 'e';
+    OutData[CS2_DATA7] = 'n';
+  }
+  sendDataCS2();
+  newMsgCS2 (CS2_CFG_DATA, 8, 0);
+  snprintf(folgeInfo, 9, "%d %d", ctr, cnt);
+  lng = strlen(folgeInfo);
+  for (n = 0; n < lng; n++)
+    OutData[CS2_DATA0 + n] = folgeInfo[n];
+  sendDataCS2();
+  }
+*/
+
+void getLokinfoCS2() {                                                    // get 'lokinfo' stream for current edit loco name
+  int lng, i, n;
+  lng = strlen (locoEditName);
+  if (lng > 0) {
+    newMsgCS2 (CS2_CFG_DATA, 8, 0);
+    OutData[CS2_DATA0] = 'l';
+    OutData[CS2_DATA1] = 'o';
+    OutData[CS2_DATA2] = 'k';
+    OutData[CS2_DATA3] = 'i';
+    OutData[CS2_DATA4] = 'n';
+    OutData[CS2_DATA5] = 'f';
+    OutData[CS2_DATA6] = 'o';
+    sendDataCS2();
+    newMsgCS2 (CS2_CFG_DATA, 8, 0);
+    n = (lng > 8) ? 8 : lng;
+    for (i = 0; i < n; i++)
+      OutData[CS2_DATA0 + i] = locoEditName[i];
+    sendDataCS2();
+    newMsgCS2 (CS2_CFG_DATA, 8, 0);
+    if (lng > 8) {
+      for (i = 0; i < (lng - 8); i++)
+        OutData[CS2_DATA0 + i] = locoEditName[i + 8];
+    }
+    sendDataCS2();
+  }
+}
+
+void endLokinfoCS2() {
+  lokinfoState = LOKINFO_IDLE;                                            // all data stream received or aborted
+  buttonData[BUT_CS2_UID].backgnd = (scrProt == LOK_MFX) ? COLOR_CREAM : COLOR_DARKGREY;
+  newEvent(OBJ_BUTTON, BUT_CS2_UID, EVNT_DRAW);
+  snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
+  newEvent(OBJ_TXT, TXT_EDIT_PROT, EVNT_DRAW);
+  if (!uidFound)
+    alertWindow(ERR_NAME);
+}
+
+void getDataStream(byte *buf) {                                           // get a complete line of data stream
+  char chr;
+  uint8_t n;
+  for (n = 0; n < 8; n++) {
+    chr = (char)buf[CS2_DATA0 + n];
+    if ((chr == 0x0A) || (chr == '\0')) {
+      lineStreamCS2[streamPosCS2] = '\0';
+      parseLineStream();
+      streamPosCS2 = 0;
+      n = 8;
+    }
+    else
+      lineStreamCS2[streamPosCS2++] = chr;
+  }
+}
+
+
+void parseLineStream() {                                                  // find UID in data stream
+  uint16_t uid;
+  //DEBUG_MSG("Stream line: %s", lineStreamCS2)
+  uid = 0;
+  if (!strncmp(lineStreamCS2, " .uid=0x", 8)) {
+    uidHEX(lineStreamCS2 + 8, &uid);
+    uidFound = true;
+    if ((uid & 0xC000) == 0x4000) {                                       // check if UID is of a MFX locomotive
+      snprintf (locoEditID, UID_LNG + 1, "%d", uid);
+      newEvent(OBJ_TXT, TXT_EDIT_IMAGE, EVNT_DRAW);
+      lpicData[LPIC_LOK_EDIT].id = uid;
+      tft.fillRect(lpicData[LPIC_LOK_EDIT].x, lpicData[LPIC_LOK_EDIT].y, 190, 40, COLOR_BACKGROUND);
+      newEvent(OBJ_LPIC, LPIC_LOK_EDIT, EVNT_DRAW);
+    }
+  }
+  if (!strncmp(lineStreamCS2, " .typ=mfx", 9)) {                          // show the current protocol for this loco name
+    scrProt = LOK_MFX;
+  }
+  if (!strncmp(lineStreamCS2, " .typ=dcc", 9)) {
+    scrProt = LOK_DCC;
+    endLokinfoCS2();                                                      // exit if not an MFX loco
+  }
+  if (!strncmp(lineStreamCS2, " .typ=mm", 8)) {
+    scrProt = LOK_MM;
+    endLokinfoCS2();                                                      // exit if not an MFX loco
+  }
+}
+
+
+void uidHEX (char *buf, uint16_t *value) {                                // convert hex value
+  uint16_t val, n;
+  char c;
+  val = 0;
+  n = 0;
+  while (buf[n]) {
+    c = buf[n++];
+    val *= 16;
+    if (isDigit(c)) {
+      val += (c - '0');
+    }
+    else {
+      c &= 0xDF;
+      val += ((c - 'A') + 10);
+    }
+  }
+  *value = val;
+}
+
+
+
+
 ////////////////////////////////////////////////////////////
 // ***** CS2 DECODE *****
 ////////////////////////////////////////////////////////////
@@ -310,7 +466,7 @@ void DecodeCS2() {
   DEBUG_MSG("PAYLOAD: %0X %0X %0X %0X %0X %0X %0X %0X", packetBuffer[CS2_DATA0], packetBuffer[CS2_DATA1], packetBuffer[CS2_DATA2], packetBuffer[CS2_DATA3], packetBuffer[CS2_DATA4], packetBuffer[CS2_DATA5], packetBuffer[CS2_DATA6], packetBuffer[CS2_DATA7])
 
   if (!bitRead(packetBuffer[CS2_PRIO], 0)) {
-    if (bitRead(packetBuffer[CS2_CMD], 0)) {                                // parse only answers
+    if (bitRead(packetBuffer[CS2_CMD], 0)) {                              // parse only answers
       cmd = packetBuffer[CS2_CMD] & 0xFE;
       switch (cmd) {
         case CS2_SYS:
@@ -364,10 +520,10 @@ void DecodeCS2() {
           if ((packetBuffer[CS2_DLC] == 5) && isMyLocoCS2())  {
             switch (packetBuffer[CS2_DATA4]) {
               case 1:
-                locoData[myLocoData].myDir = 0x80;                          // forward
+                locoData[myLocoData].myDir = 0x80;                        // forward
                 break;
               case 2:
-                locoData[myLocoData].myDir = 0x00;                          // backwards
+                locoData[myLocoData].myDir = 0x00;                        // backwards
                 break;
             }
             if (isWindow(WIN_THROTTLE) || isWindow(WIN_SPEEDO))
@@ -394,7 +550,7 @@ void DecodeCS2() {
           // 0030 MS2 60653, Txxxxx
           // 0031 MS2
           // 0032 MS2
-          // 0033 MS2
+          // 0033 MS2 60657
           // 0034 MS2
           // 0040 LinkS88 (UID: 0x533xxxxx) / SRSEII S88 gateway
           // 0050 CS2/3-GFP
@@ -403,6 +559,8 @@ void DecodeCS2() {
           // FFF0 CS2 (Slave)
           // FFFF CS2/3-GUI (Master)
 
+          if ((packetBuffer[CS2_DATA7] & 0xF0) == 0x30)
+            ms2New = (packetBuffer[CS2_DATA4] > 2) ? true : false;
           DEBUG_MSG("UID: %0X%0X%0X%0X v%d.%d Type: %0X%0X", packetBuffer[CS2_DATA0], packetBuffer[CS2_DATA1], packetBuffer[CS2_DATA2], packetBuffer[CS2_DATA3], packetBuffer[CS2_DATA4], packetBuffer[CS2_DATA5], packetBuffer[CS2_DATA6], packetBuffer[CS2_DATA7])
           break;
         case CS2_READ_CFG:
@@ -427,18 +585,74 @@ void DecodeCS2() {
           break;
         case CS2_ACC:
           value = (packetBuffer[CS2_DATA2] << 8 | packetBuffer[CS2_DATA3]) & 0x07FF;
-          accessoryChange(value, packetBuffer[CS2_DATA4] & 0x01);
+          accessoryChange(value + 1, packetBuffer[CS2_DATA4] & 0x01);
+          break;
+        case CS2_S88_POLLING:
+          DEBUG_MSG("Module: %d Contact: 0x%02X 0x%02X", packetBuffer[CS2_DATA4], packetBuffer[CS2_DATA5], packetBuffer[CS2_DATA6])
+          value = packetBuffer[CS2_DATA4] << 4;                                             // S88 module
+          for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
+            if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+              if (((automation[n].param - 1) & 0xFFF0) == value) {
+                value = (packetBuffer[CS2_DATA5] << 8) | packetBuffer[CS2_DATA6];           // S88 data
+                automation[n].value = bitRead(value, automation[n].param & 0x000F);
+              }
+            }
+          }
+          break;
+        case CS2_S88_EVENT:
+          value = (packetBuffer[CS2_DATA2] << 8 | packetBuffer[CS2_DATA3]);                 // S88 addr
+          DEBUG_MSG("Contact: %d State: %d", value, packetBuffer[CS2_DATA5])
+          for (byte n = 0; n < MAX_AUTO_SEQ; n++) {
+            if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+              if (automation[n].param == value)
+                automation[n].value = packetBuffer[CS2_DATA5];
+            }
+          }
+          break;
+        default:
+          DEBUG_MSG("%c%c%c%c%c%c%c%c", (char)packetBuffer[CS2_DATA0], (char)packetBuffer[CS2_DATA1], (char)packetBuffer[CS2_DATA2], (char)packetBuffer[CS2_DATA3], (char)packetBuffer[CS2_DATA4], (char)packetBuffer[CS2_DATA5], (char)packetBuffer[CS2_DATA6], (char)packetBuffer[CS2_DATA7])
           break;
       }
     }
-    else {                                                              // command from CS2
-      if (packetBuffer[CS2_CMD] == CS2_PING) {
-        newMsgCS2 (CS2_PING | 0x01, 8, 0x464D);
-        OutData[CS2_DATA4] = 0x00;
-        OutData[CS2_DATA5] = 0x0C;
-        OutData[CS2_DATA6] = 0xFF;
-        OutData[CS2_DATA7] = 0xE0;
-        sendDataCS2();
+    else {                                                                // command from CS2
+      switch (packetBuffer[CS2_CMD]) {
+        case CS2_CFG_STREAM:                                              // Config Data Stream
+          switch (lokinfoState) {
+            case LOKINFO_START:
+              if (packetBuffer[CS2_DLC] == 6) {                           // First packet with data length and CRC
+                lokinfoTotal = (packetBuffer[CS2_DATA0] << 24) | (packetBuffer[CS2_DATA1] << 16) | (packetBuffer[CS2_DATA2] << 8) | packetBuffer[CS2_DATA3];
+                lokinfoLng = 0;
+                streamPosCS2 = 0;
+                lokinfoState = LOKINFO_DATA;
+                uidFound = false;
+                isMFX = false;
+                //DEBUG_MSG("Stream length: %d", lokinfoTotal)
+              }
+              break;
+            case LOKINFO_DATA:
+              if (packetBuffer[CS2_DLC] == 8) {                           // data packet always has 8 bytes
+                getDataStream(packetBuffer);
+                lokinfoLng += 8;
+                if (lokinfoLng >= lokinfoTotal)
+                  endLokinfoCS2();
+                //DEBUG_MSG("Stream bytes: %d", lokinfoLng)
+              }
+              else
+                endLokinfoCS2();                                          // all other data lengths aborts reception
+              break;
+          }
+          DEBUG_MSG("%c%c%c%c%c%c%c%c", (char)packetBuffer[CS2_DATA0], (char)packetBuffer[CS2_DATA1], (char)packetBuffer[CS2_DATA2], (char)packetBuffer[CS2_DATA3], (char)packetBuffer[CS2_DATA4], (char)packetBuffer[CS2_DATA5], (char)packetBuffer[CS2_DATA6], (char)packetBuffer[CS2_DATA7])
+          break;
+        case CS2_PING:                                                    // PING
+          /*
+            newMsgCS2 (CS2_PING | 0x01, 8, 0x464D);                         // not sure if I have to answer
+            OutData[CS2_DATA4] = 0x00;
+            OutData[CS2_DATA5] = 0x0C;
+            OutData[CS2_DATA6] = 0xFF;
+            OutData[CS2_DATA7] = 0xE0;
+            sendDataCS2();
+          */
+          break;
       }
     }
   }

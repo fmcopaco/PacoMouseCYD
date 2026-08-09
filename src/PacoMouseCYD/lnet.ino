@@ -261,7 +261,7 @@ void emergencyOffLnet() {
 void emergencyStopLnet() {
   SendPacket.data[0] = OPC_IDLE;                                    //  B'cast emerg. STOP
   lnetSend(&SendPacket);
-  
+
 }
 
 void infoLocomotoraLnet (unsigned int address) {
@@ -567,11 +567,12 @@ void showTrkLnet(uint8_t trk) {
       if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
         alertWindow(ERR_SERV);
       }
-      if (!(trk & GTRK_IDLE)) {                                       // broadcasting an emergency stop?
+    */
+    if (!(trk & GTRK_IDLE)) {                                       // broadcasting an emergency stop?
+      setColorRGB(LED_RGB_BLUE);
       if ((isWindow(WIN_THROTTLE)) || (isWindow(WIN_STEAM)))
         alertWindow(ERR_STOP);
-      }
-    */
+    }
   }
 }
 
@@ -683,6 +684,12 @@ void lnetDecode (lnMsg * LnPacket) {
         state = (LnPacket->srp.sn2 & OPC_SW_REP_CLOSED) ? true : false;   // output levels for turnout feedback
       accessoryChange(adr, state);
       break;
+    case OPC_INPUT_REP:                                             // General SENSOR Input codes (OPC_INPUT_REP)
+      adr = (LnPacket->ir.in1 | ((LnPacket->ir.in2 & 0x0F) << 7));
+      adr <<= 1;
+      adr += (LnPacket->ir.in2 & OPC_INPUT_REP_SW) ? 2 : 1;
+      lnetNotifySensor(adr, LnPacket->ir.in2 & OPC_INPUT_REP_HI);
+      break;
     case OPC_IMM_PACKET:
       if ((LnPacket->sp.mesg_size == 0x0B) && (LnPacket->sp.val7f == 0x7F)) {
         if (bitRead(LnPacket->sp.dhi, 0)) {
@@ -718,6 +725,10 @@ void lnetDecode (lnMsg * LnPacket) {
         bitClear(mySlot.trk, 0);
         showTrkLnet(mySlot.trk);
       }
+      break;
+    case OPC_IDLE:
+      bitClear(mySlot.trk, 1);
+      showTrkLnet(mySlot.trk);
       break;
     case OPC_SL_RD_DATA:                                            // informacion de un slot
       adr = (LnPacket->sd.adr2 << 7) + LnPacket->sd.adr;
@@ -940,6 +951,17 @@ void setFastClock(lnMsg * LnPacket) {
   clockTimer = millis();
   DEBUG_MSG("CLOCK %d:%d R:%d", clockHour, clockMin, clockRate);
   updateFastClock();
+}
+
+
+void lnetNotifySensor(uint16_t Address, uint8_t State) {        // General SENSOR input codes (OPC_INPUT_REP)
+  uint16_t n;
+  for (n = 0; n < MAX_AUTO_SEQ; n++) {
+    if ((automation[n].opcode == 'Z') || (automation[n].opcode == 'z')) {
+      if (automation[n].param == Address)
+        automation[n].value = State;
+    }
+  }
 }
 
 

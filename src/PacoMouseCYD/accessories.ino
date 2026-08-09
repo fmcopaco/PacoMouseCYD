@@ -236,6 +236,15 @@ void accPanelClick(uint8_t pos) {
       case ACC_KEYPAD:
         openWindow(WIN_ACC_CTRL);
         break;
+      case ACC_ROUTE:
+        addr = accPanel[pos].addr;
+        if ((addr > 0) && addr <= AUTOMATION_MAX) {
+          if (findAutomation(addr) != MAX_AUTO_SEQ)
+            stopAutomation(addr);
+          else
+            startAutomation(addr);
+        }
+        break;
       default:
         addr = accPanel[pos].addr;
         outs = accPanel[pos].activeOutput;
@@ -342,6 +351,23 @@ void accTypeClick() {
       updateAccPanel();
       updateSpeedHID();                                           // set encoder
       closeWindow(WIN_ACC_TYPE);
+      break;
+    case ACC_ROUTE:
+      if (index != accPanel[paramChild].type) {
+        currAccEdit.type = (accType)index;
+        currAccEdit.addr = 0;
+        currAccEdit.addr2 = 0;
+        currAccEdit.currAspect = 0;
+        currAccEdit.activeOutput = accOutDefault[index];
+        currAccEdit.accName[0] = '\0';
+      }
+      else {
+        currAccEdit = accPanel[paramChild];
+      }
+      snprintf(accKeybName, ACC_LNG + 1, currAccEdit.accName);
+      snprintf(accKeybAddr1, ADDR_LNG + 1, "%d", currAccEdit.addr);
+      closeWindow(WIN_ACC_TYPE);
+      openWindow(WIN_ROUTE_EDIT);
       break;
     default:
       if (index != accPanel[paramChild].type) {
