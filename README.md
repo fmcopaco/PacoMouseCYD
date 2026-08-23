@@ -27,6 +27,7 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
   * Extra: Game card cards & waybills editor in the SD from the web browser
   * Multiple WiFi networks
   * WiFi Analyzer
+  * Remote access to SD (FTP server)
   * Firmware update from SD
   * Battery level option
   * Menus in different languages:

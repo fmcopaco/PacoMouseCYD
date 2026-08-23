@@ -1,7 +1,7 @@
 /*    PacoMouseCYD throttle -- F. Cañada 2025-2026 --  https://usuaris.tinet.cat/fmco/
 */
 
-enum language {LANG_ENGLISH, LANG_SPANISH, LANG_CATALAN, LANG_GERMAN, LANG_CZECH, LANG_FRENCH, MAX_LANG};
+enum language {LANG_ENGLISH, LANG_SPANISH, LANG_CATALAN, LANG_GERMAN, LANG_CZECH, LANG_FRENCH, LANG_DUTCH, MAX_LANG};
 
 static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDER: Same order defined in labelObj. If a complete translation is missing, must be English definition.
   { // LBL_PACO_TXT
@@ -14,6 +14,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Willkommen!",
     [LANG_CZECH]   = "Vitejte!",
     [LANG_FRENCH]  = "Bienvenue!",
+    [LANG_DUTCH]   = "Welkom!",
   },
   { // LBL_CONNECT
     [LANG_ENGLISH] = "Connecting...",
@@ -22,6 +23,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Verbindung...",
     [LANG_CZECH]   = "Pripojuji se...",
     [LANG_FRENCH]  = "Connexion...",
+    [LANG_DUTCH]   = "Verbinden...",
   },
   { // LBL_PRESS
     [LANG_ENGLISH] = "Touch to start...",
@@ -30,6 +32,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Beruhren Sie den\nBildschirm, um \nzu beginnen...",
     [LANG_CZECH]   = "Dotknete se pro\nspusteni...",
     [LANG_FRENCH]  = "Appuyer pour\ndemarrer...",
+    [LANG_DUTCH]   = "Aanraken om\nte starten...",
   },
   { // LBL_CAL
     [LANG_ENGLISH] = "To calibrate the\ntouchscreen, touch the\ncorners that appear\nwith the pen.",
@@ -38,6 +41,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Um den Touchscreen\nzu kalibrieren, beruhren\nSie die angezeigten Ecken\nmit dem Stift.",
     [LANG_CZECH]   = "Pro kalibraci dotykove\nobrazovky se dotknete\nperem rohu, kde se\nobjevi ikona",
     [LANG_FRENCH]  = "Pour calibrer l'ecran,\ncliquer sur les\nangles qui apparaissent\navec le stylo.",
+    [LANG_DUTCH]   = "Voor kallibratie\nde hoeken die verschijnen\naantippen met de pen.",
   },
   { // LBL_CAL_DONE
     [LANG_ENGLISH] = "Calibration done.",
@@ -46,6 +50,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Kalibrierung\nabgeschlossen.",
     [LANG_CZECH]   = "Kalibrace dokoncena.",
     [LANG_FRENCH]  = "Calibration faite.",
+    [LANG_DUTCH]   = "Callibratie klaar.",
   },
   { // LBL_WIFI_NET
     [LANG_ENGLISH] = "WiFi Network",
@@ -54,6 +59,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "WLAN-Netzwerk",
     [LANG_CZECH]   = "WiFi sit",
     [LANG_FRENCH]  = "Reseau WiFi",
+    [LANG_DUTCH]   = "WiFi Netwerk",
   },
   { // LBL_SCAN
     [LANG_ENGLISH] = "SSID WiFi\nScanning...",
@@ -62,6 +68,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "SSID WiFi\nScannen...",
     [LANG_CZECH]   = "SSID WiFi\nVyhledavani...",
     [LANG_FRENCH]  = "SSID WiFi\nScan...",
+    [LANG_DUTCH]   = "SSID WiFi\nScannen...",
   },
   { // LBL_SSID_SCAN
     [LANG_ENGLISH] = "SSID WiFi",
@@ -79,10 +86,16 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Passwort",
     [LANG_CZECH]   = "Heslo",
     [LANG_FRENCH]  = "Mot de passe",
+    [LANG_DUTCH]   = "Wachtwoord",
   },
   { // LBL_PORT
     [LANG_ENGLISH] = "Port",
     [LANG_SPANISH] = "Puerto",
+    [LANG_CATALAN] = NULL,
+    [LANG_GERMAN]  = NULL,
+    [LANG_CZECH]   = NULL,
+    [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Poort",
   },
   { // LBL_PROTOCOL
     [LANG_ENGLISH] = "Protocol",
@@ -91,6 +104,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Protokoll",
     [LANG_CZECH]   = "Protokol",
     [LANG_FRENCH]  = "Protocole",
+    [LANG_DUTCH]   = NULL,
   },
   { // LBL_SEL_PROT
     [LANG_ENGLISH] = "Protocol",
@@ -128,6 +142,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Optionen",
     [LANG_CZECH]   = "Moznosti",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Opties",
   },
   { // LBL_NAME
     [LANG_ENGLISH] = "Name",
@@ -136,6 +151,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = NULL,
     [LANG_CZECH]   = "Jmeno",
     [LANG_FRENCH]  = "Nom",
+    [LANG_DUTCH]   = "Naam",
   },
   { // LBL_ADDR
     [LANG_ENGLISH] = "Address",
@@ -144,6 +160,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Adresse",
     [LANG_CZECH]   = "Adresa",
     [LANG_FRENCH]  = "Adresse",
+    [LANG_DUTCH]   = "Adres",
   },
   { // LBL_IMAGE
     [LANG_ENGLISH] = "Image",
@@ -152,6 +169,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bild",
     [LANG_CZECH]   = "Obrazek",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Plaatje",
   },
   { // LBL_VMAX
     [LANG_ENGLISH] = "Speed max.",
@@ -160,6 +178,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Geschw.max.",
     [LANG_CZECH]   = "Max. rychlost",
     [LANG_FRENCH]  = "Vitesse maxi.",
+    [LANG_DUTCH]   = "Topsnelheid",
   },
   { // LBL_FUNC
     [LANG_ENGLISH] = "Functions",
@@ -168,6 +187,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Funktionen",
     [LANG_CZECH]   = "Funkce",
     [LANG_FRENCH]  = "Fonctions",
+    [LANG_DUTCH]   = "Functies",
   },
   { // LBL_SERVICE
     [LANG_ENGLISH] = "Service Mode",
@@ -176,6 +196,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Servicemodus",
     [LANG_CZECH]   = "Servisni rezim",
     [LANG_FRENCH]  = "Mode service",
+    [LANG_DUTCH]   = "Servicemode",
   },
   { // LBL_KMH
     [LANG_ENGLISH] = "km/h",
@@ -187,6 +208,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Rangieren",
     [LANG_CZECH]   = "Posun",
     [LANG_FRENCH]  = "Manoeuvres",
+    [LANG_DUTCH]   = NULL,
   },
   { // LBL_RATE
     [LANG_ENGLISH] = "Rate  1:",
@@ -195,6 +217,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = NULL,
     [LANG_CZECH]   = "Pomer 1:",
     [LANG_FRENCH]  = "Ratio  1:",
+    [LANG_DUTCH]   = "Ratio 1:",
   },
   { // LBL_CHG_WIFI
     [LANG_ENGLISH] = "Reset to apply\nchanges",
@@ -203,6 +226,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Neustart, um die\nAnderungen zu\nübernehmen",
     [LANG_CZECH]   = "Restartujte pro\npouziti zmen",
     [LANG_FRENCH]  = "Reset pour\nappliquer les\nchangements",
+    [LANG_DUTCH]   = "Reset om de\nwijzigingen\ntoe te passen",
   },
   { // LBL_EDIT_FUNC
     [LANG_ENGLISH] = "Functions",
@@ -211,6 +235,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Funktionen",
     [LANG_CZECH]   = "Funkce",
     [LANG_FRENCH]  = "Fonctions",
+    [LANG_DUTCH]   = "Functies",
   },
   { // LBL_STACK_FULL
     [LANG_ENGLISH] = "Locomotive stack\nfull!",
@@ -219,6 +244,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Lokomotivstapel\nvoll!",
     [LANG_CZECH]   = "Adresar lokomotiv\nje plny",
     [LANG_FRENCH]  = "Stack Locos\nplein !",
+    [LANG_DUTCH]   = "Locomotieven\nopslag vol !",
   },
   { // LBL_STOP_0
     [LANG_ENGLISH] = "Speed 0",
@@ -227,6 +253,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Geschw. 0",
     [LANG_CZECH]   = "Rychlost 0",
     [LANG_FRENCH]  = "Vitesse 0",
+    [LANG_DUTCH]   = "Snelheid 0",
   },
   { // LBL_STOP_E
     [LANG_ENGLISH] = "Emerg. Stop",
@@ -235,6 +262,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Not-Halt",
     [LANG_CZECH]   = "Nouzove zastav.",
     [LANG_FRENCH]  = "Arret d'urgence",
+    [LANG_DUTCH]   = "Noodstop",
   },
   { // LBL_SEL_IMAGE
     [LANG_ENGLISH] = "Image",
@@ -243,6 +271,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bild",
     [LANG_CZECH]   = "Obrazek",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Plaatje",
   },
   { // LBL_MENU_DRIVE
     [LANG_ENGLISH] = "Drive",
@@ -251,6 +280,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Fahren",
     [LANG_CZECH]   = "Jizda",
     [LANG_FRENCH]  = "Conduire",
+    [LANG_DUTCH]   = "Rijden",
   },
   { // LBL_MENU_ACC
     [LANG_ENGLISH] = "Accesory",
@@ -259,6 +289,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Zubehorartikel",
     [LANG_CZECH]   = "Prislusenstvi",
     [LANG_FRENCH]  = "Accessoires",
+    [LANG_DUTCH]   = "Accessoire",
   },
   { // LBL_MENU_CV
     [LANG_ENGLISH] = "CV Programming",
@@ -267,6 +298,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "CV-Programmierung",
     [LANG_CZECH]   = "Programovani CV",
     [LANG_FRENCH]  = "Programmation CV",
+    [LANG_DUTCH]   = "CV Programmeren",
   },
   { // LBL_MENU_CFG
     [LANG_ENGLISH] = "Configure",
@@ -275,6 +307,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Einstellungen",
     [LANG_CZECH]   = "Nastavit",
     [LANG_FRENCH]  = "Configuration",
+    [LANG_DUTCH]   = "Configuratie",
   },
   { // LBL_MENU_UTILS
     [LANG_ENGLISH] = "Utilities",
@@ -283,6 +316,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Dienstprogramme",
     [LANG_CZECH]   = "Nastroje",
     [LANG_FRENCH]  = "Utilitaires",
+    [LANG_DUTCH]   = NULL,
   },
   { // LBL_CFG_LANG
     [LANG_ENGLISH] = "Language",
@@ -291,6 +325,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Sprache",
     [LANG_CZECH]   = "Jazyk",
     [LANG_FRENCH]  = "Langue",
+    [LANG_DUTCH]   = "Taal",
   },
   { // LBL_CFG_SCR
     [LANG_ENGLISH] = "Screen",
@@ -299,6 +334,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bildschirm",
     [LANG_CZECH]   = "Displej",
     [LANG_FRENCH]  = "Ecran",
+    [LANG_DUTCH]   = "Scherm",
   },
   { // LBL_CFG_SPD
     [LANG_ENGLISH] = "Speed",
@@ -307,6 +343,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Geschwindigkeit",
     [LANG_CZECH]   = "Rychlost",
     [LANG_FRENCH]  = "Vitesse",
+    [LANG_DUTCH]   = "Snelheid",
   },
   { // LBL_CFG_WIFI
     [LANG_ENGLISH] = "WiFi",
@@ -318,6 +355,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Uhr",
     [LANG_CZECH]   = "Rychle hodiny",
     [LANG_FRENCH]  = "Horloge rapide",
+    [LANG_DUTCH]   = "Snelle klok",
   },
   { // LBL_CFG_LOCK
     [LANG_ENGLISH] = "Lock",
@@ -326,6 +364,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Sperre",
     [LANG_CZECH]   = "Zamek",
     [LANG_FRENCH]  = "Verrouillage",
+    [LANG_DUTCH]   = "Slot",
   },
   { // LBL_CFG_ABOUT
     [LANG_ENGLISH] = "About...",
@@ -334,6 +373,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Info...",
     [LANG_CZECH]   = "O nas...",
     [LANG_FRENCH]  = "Info...",
+    [LANG_DUTCH]   = "Over...",
   },
   { // LBL_SCR_ROTATE
     [LANG_ENGLISH] = "Rotate",
@@ -342,6 +382,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Drehen",
     [LANG_CZECH]   = "Otocit",
     [LANG_FRENCH]  = "Rotation",
+    [LANG_DUTCH]   = "Draaien",
   },
   { // LBL_PACO_WEB
     [LANG_ENGLISH] = "https://usuaris.tinet.cat/fmco",
@@ -353,6 +394,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Lokomotiven",
     [LANG_CZECH]   = "Lokomotivy",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Locomotief",
   },
   { // LBL_LOCK_ACC
     [LANG_ENGLISH] = "Accesory",
@@ -361,6 +403,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Zubehorartikel",
     [LANG_CZECH]   = "Prislusenstvi",
     [LANG_FRENCH]  = "Accessoires",
+    [LANG_DUTCH]   = "Accessoire",
   },
   { // LBL_LOCK_PRG
     [LANG_ENGLISH] = "Programming",
@@ -369,6 +412,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Programmierung",
     [LANG_CZECH]   = "Programovani",
     [LANG_FRENCH]  = "Programmation",
+    [LANG_DUTCH]   = "Programmeren",
   },
   { // LBL_OPT_ADR
     [LANG_ENGLISH] = "Short Addr. (1 to 99)",
@@ -377,6 +421,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Kurze Adr. (1 bis 99)",
     [LANG_CZECH]   = "Kratka adr.(1 az 99)",
     [LANG_FRENCH]  = "Adr. courte (1 a 99)",
+    [LANG_DUTCH]   = "Kort adres (1 tot 99)",
   },
   { // LBL_OPT_IB2
     [LANG_ENGLISH] = "IBII / DR5000",
@@ -394,6 +439,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Not-Halt",
     [LANG_CZECH]   = "Nouzove zastav.",
     [LANG_FRENCH]  = "Arret d'urgence",
+    [LANG_DUTCH]   = "Noodstop",
   },
   { // LBL_SCALE
     [LANG_ENGLISH] = "Scale",
@@ -402,6 +448,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Skala",
     [LANG_CZECH]   = "Meritko",
     [LANG_FRENCH]  = "Echelle",
+    [LANG_DUTCH]   = "Schaal",
   },
   { // LBL_MM
     [LANG_ENGLISH] = "mm",
@@ -428,6 +475,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Messung",
     [LANG_CZECH]   = "Mereni",
     [LANG_FRENCH]  = "Mesures",
+    [LANG_DUTCH]   = "Meten",
   },
   { // LBL_CV_ADDR
     [LANG_ENGLISH] = "Loco Address",
@@ -436,6 +484,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Lokadresse",
     [LANG_CZECH]   = "Adresa Lokomotivy",
     [LANG_FRENCH]  = "Adresse Loco.",
+    [LANG_DUTCH]   = "Lok Addres",
   },
   { // LBL_CV_SPD_L
     [LANG_ENGLISH] = "Speed min.",
@@ -444,6 +493,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Minimale Geschw.",
     [LANG_CZECH]   = "Min. rychlost",
     [LANG_FRENCH]  = "Vitesse min.",
+    [LANG_DUTCH]   = "Min. snelheid",
   },
   { // LBL_CV_SPD_M
     [LANG_ENGLISH] = "Speed mid.",
@@ -452,6 +502,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Mittlere Geschw.",
     [LANG_CZECH]   = "Stredni rychlost",
     [LANG_FRENCH]  = "Vitesse moy.",
+    [LANG_DUTCH]   = "Midden snelheid",
   },
   { // LBL_CV_SPD_H
     [LANG_ENGLISH] = "Speed max.",
@@ -460,6 +511,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Maximale Geschw.",
     [LANG_CZECH]   = "Max. rychlost",
     [LANG_FRENCH]  = "Vitesse max.",
+    [LANG_DUTCH]   = "Max. snelheid",
   },
   { // LBL_CV_ACC
     [LANG_ENGLISH] = "Acceleration",
@@ -468,6 +520,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Beschleunig",
     [LANG_CZECH]   = "Zrychleni",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Versnelling",
   },
   { // LBL_CV_DEC
     [LANG_ENGLISH] = "Braking",
@@ -476,6 +529,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bremsen",
     [LANG_CZECH]   = "Brzdeni",
     [LANG_FRENCH]  = "Freinage",
+    [LANG_DUTCH]   = "Remmen",
   },
   { // LBL_CV_CFG
     [LANG_ENGLISH] = "Configuration",
@@ -484,6 +538,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Konfiguration",
     [LANG_CZECH]   = "Konfigurace",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Configuratie",
   },
   { // LBL_CV_MAN
     [LANG_ENGLISH] = "Manufacturer",
@@ -492,6 +547,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Hersteller",
     [LANG_CZECH]   = "Vyrobce",
     [LANG_FRENCH]  = "Fabricant",
+    [LANG_DUTCH]   = "Fabrikant",
   },
   { // LBL_CV
     [LANG_ENGLISH] = "CV",
@@ -512,6 +568,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "CV-FEHLER",
     [LANG_CZECH]   = "CHYBA CV",
     [LANG_FRENCH]  = "ERREUR CV",
+    [LANG_DUTCH]   = "CV FOUT",
   },
   { // LBL_UTIL_SPEED
     [LANG_ENGLISH] = "Measure speed",
@@ -520,6 +577,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Geschw. messen",
     [LANG_CZECH]   = "Merit rychlost",
     [LANG_FRENCH]  = "Mesure de vitesse",
+    [LANG_DUTCH]   = "Snelheid meten",
   },
   { // LBL_UTIL_STEAM
     [LANG_ENGLISH] = "Steam locomotive",
@@ -528,6 +586,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Dampflokomotive",
     [LANG_CZECH]   = "Parni Lokomotiva",
     [LANG_FRENCH]  = "Locomotive a vapeur",
+    [LANG_DUTCH]   = "Stoomlok",
   },
   { // LBL_UTIL_SCAN
     [LANG_ENGLISH] = "WiFi Analyzer",
@@ -536,6 +595,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "WLAN-Analysator",
     [LANG_CZECH]   = "Analyzator WiFi",
     [LANG_FRENCH]  = "Analyseur WiFi",
+    [LANG_DUTCH]   = "WiFi analize",
   },
   { // LBL_UTIL_STA
     [LANG_ENGLISH] = "Station Run",
@@ -544,6 +604,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bahnhofsrennen",
     [LANG_CZECH]   = "Jizda ve stanici",
     [LANG_FRENCH]  = "Course de la gare",
+    [LANG_DUTCH]   = "Stationracen",
   },
   { // LBL_UTIL_NXT_TRAIN
     [LANG_ENGLISH] = "Next train",
@@ -552,6 +613,16 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Nachster Zug",
     [LANG_CZECH]   = "Dalsi vlak",
     [LANG_FRENCH]  = "Prochain train",
+    [LANG_DUTCH]   = "Volgende trein",
+  },
+  { // LBL_UTIL_REMOTE
+    [LANG_ENGLISH] = "Remote access to SD",
+    [LANG_SPANISH] = "Acceso remoto a SD",
+    [LANG_CATALAN] = "Acces remot a SD",
+    [LANG_GERMAN]  = "Fernzugriff auf SD",
+    [LANG_CZECH]   = "Vzdaleny pristup k SD",
+    [LANG_FRENCH]  = "Acces distant a SD",
+    [LANG_DUTCH]   = "Ext. toegang tot SD",
   },
   { // LBL_ASK_SURE
     [LANG_ENGLISH] = "Are you sure?",
@@ -560,6 +631,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bist du sicher?",
     [LANG_CZECH]   = "Jste si jisty?",
     [LANG_FRENCH]  = "Etes vous sur?",
+    [LANG_DUTCH]   = "Zeker weten?",
   },
   { // LBL_OPT_DISCOVER
     [LANG_ENGLISH] = "Discover",
@@ -568,6 +640,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Entdecken",
     [LANG_CZECH]   = "Zjistit",
     [LANG_FRENCH]  = "Decouverte",
+    [LANG_DUTCH]   = "Ontdekken",
   },
   { // LBL_LNCV_ART
     [LANG_ENGLISH] = "Article",
@@ -576,6 +649,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Artikel",
     [LANG_CZECH]   = "Vyrobek",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Artikel",
   },
   { // LBL_LNCV_MOD
     [LANG_ENGLISH] = "Module",
@@ -584,6 +658,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Modul",
     [LANG_CZECH]   = "Modul",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = NULL,
   },
   { // LBL_LNCV_NUM
     [LANG_ENGLISH] = "LNCV",
@@ -595,6 +670,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Zubehortyp",
     [LANG_CZECH]   = "Typ prislusenstvi",
     [LANG_FRENCH]  = "Type d'accessoire",
+    [LANG_DUTCH]   = "Accessorie type",
   },
   { // LBL_ACC_NAME
     [LANG_ENGLISH] = "Name",
@@ -603,6 +679,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = NULL,
     [LANG_CZECH]   = "Jmeno",
     [LANG_FRENCH]  = "Nom",
+    [LANG_DUTCH]   = "Naam",
   },
   { // LBL_ACC_ADDR
     [LANG_ENGLISH] = "Addr.",
@@ -611,6 +688,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Adr.",
     [LANG_CZECH]   = "Adresa",
     [LANG_FRENCH]  = "Adr.",
+    [LANG_DUTCH]   = "Adres",
   },
   { // LBL_STA_RUN
     [LANG_ENGLISH] = "Station Run",
@@ -619,6 +697,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bahnhofsrennen",
     [LANG_CZECH]   = "Jizda ve stanici",
     [LANG_FRENCH]  = "Course de la gare",
+    [LANG_DUTCH]   = "Stationsrace",
   },
   { // LBL_STA_LEVEL
     [LANG_ENGLISH] = "Level:",
@@ -627,6 +706,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = NULL,
     [LANG_CZECH]   = "Uroven:",
     [LANG_FRENCH]  = "Niveau:",
+    [LANG_DUTCH]   = "Niveau",
   },
   { // LBL_STA_START
     [LANG_ENGLISH] = "Start",
@@ -635,6 +715,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Starten",
     [LANG_CZECH]   = "Spustit",
     [LANG_FRENCH]  = "Depart",
+    [LANG_DUTCH]   = "Begin",
   },
   { // LBL_STA_INSTR
     [LANG_ENGLISH] = "Go to the station of your\ndestination color.\nPress it when you arrive",
@@ -643,6 +724,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Gehen Sie sich zum Bahnhof\nIhrer Zielfarbe. Klicken Sie\ndas Symbol, wenn Sie ankommen",
     [LANG_CZECH]   = "Jedte na stanici vasi\ncilove barvy.\nStisknete jeji symbol po prijezdu",
     [LANG_FRENCH]  = "Aller a la gare de la couleur\nde votre destination.\nAppuyer quand arrive",
+    [LANG_DUTCH]   = "Ga naar het station van\nde gekozen kleur.\nDruk erop bij aankomst",
   },
   { // LBL_STA_EXCEL
     [LANG_ENGLISH] = "Excellent!",
@@ -651,6 +733,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Exzellent!",
     [LANG_CZECH]   = "Vynikajici!",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = "Uitstekend!",
   },
   { // LBL_STA_GREAT
     [LANG_ENGLISH] = "Great!",
@@ -659,6 +742,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Sehr gut!",
     [LANG_CZECH]   = "Skvele!",
     [LANG_FRENCH]  = "Tres bien!",
+    [LANG_DUTCH]   = "Heel goed!",
   },
   { // LBL_STA_TIMEOUT
     [LANG_ENGLISH] = "TIME'S UP\nThanks for playing",
@@ -667,6 +751,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "DIE ZEIT IST UM\nDanke furs Spielen",
     [LANG_CZECH]   = "CAS VYPRSEL\ndekujeme za hru",
     [LANG_FRENCH]  = "TEMPS ECOULE\nMerci d'avoir joue",
+    [LANG_DUTCH]   = "TIJD VOORBIJ\nbedankt voor het spelen",
   },
   { // LBL_STA_STATIONS
     [LANG_ENGLISH] = "Stations",
@@ -675,6 +760,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Bahnhofe",
     [LANG_CZECH]   = "Stanice",
     [LANG_FRENCH]  = "Gares",
+    [LANG_DUTCH]   = NULL,
   },
   { // LBL_STA_TURNOUTS
     [LANG_ENGLISH] = "Turnouts",
@@ -683,6 +769,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Weichen",
     [LANG_CZECH]   = "Vyhybky",
     [LANG_FRENCH]  = "Aiguillages",
+    [LANG_DUTCH]   = "Wissels",
   },
   { // LBL_STA_TIME
     [LANG_ENGLISH] = "Time",
@@ -691,6 +778,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Zeit",
     [LANG_CZECH]   = "Cas",
     [LANG_FRENCH]  = "Temps",
+    [LANG_DUTCH]   = "Tijd",
   },
   { // LBL_STA_DESC
     [LANG_ENGLISH] = "Address  Orientat.   Inverted",
@@ -699,6 +787,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Adresse  Ausricht.  Invertiert",
     [LANG_CZECH]   = "Adresa Orientace  Obracene",
     [LANG_FRENCH]  = "Adresse  Orientat.   Inverse",
+    [LANG_DUTCH]   = "Adres.   Orient. Omgekeerd",
   },
   { // LBL_DEF_ACTION
     [LANG_ENGLISH] = "Key Assignment",
@@ -707,6 +796,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Tastenbelegung",
     [LANG_CZECH]   = "Prirazeni klaves",
     [LANG_FRENCH]  = "Affectation boutons",
+    [LANG_DUTCH]   = "Sleutel toewijzing",
   },
   { // LBL_ACTIONS
     [LANG_ENGLISH] = "No function\nCalibrate\nEmerg. Off\nEmerg. Stop\nEmerg. Brake\nShunting\n>>>\n<<<\n",
@@ -715,6 +805,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Keine Funktion\nKalibrieren\nNot-Aus\nNot-Halt\nNotbremse\nRangieren\n>>>\n<<<\n",
     [LANG_CZECH]   = "Zadna funkce\nKalibrace\nNouzove odpojit\nNouzove zastav.\nRychlobrzda\nPosun\n>>>\n<<<\n",
     [LANG_FRENCH]  = "Aucune fonction\nCalibrer\nCoupure d'urg.\nArret d'urgence\nFreinage d'urg.\nManoeuvres\n>>>\n<<<\n",
+    [LANG_DUTCH]   = "Geen functie\nKallibreer\nNood uit\nNoodstop\nNoodrem\nShunten\n>>>\n<<<\n",
   },
   { // LBL_NOT_FOUND
     [LANG_ENGLISH] = "File not\nfound!",
@@ -723,6 +814,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Datei nicht\ngefunden!",
     [LANG_CZECH]   = "Soubor\nnenalezen!",
     [LANG_FRENCH]  = "Fichier\nintrouvable!",
+    [LANG_DUTCH]   = "File niet\ngevonden",
   },
   { // LBL_UPDATE
     [LANG_ENGLISH] = "Update Firmware",
@@ -731,6 +823,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Firmware aktualisieren",
     [LANG_CZECH]   = "Aktualizace firmwaru",
     [LANG_FRENCH]  = "Mise a jour du firmware",
+    [LANG_DUTCH]   = "Firmware aktualiseren",
   },
   { // LBL_BATT
     [LANG_ENGLISH] = "Battery",
@@ -739,6 +832,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Batterie",
     [LANG_CZECH]   = "Baterie",
     [LANG_FRENCH]  = "Batterie",
+    [LANG_DUTCH]   = "Batterij",
   },
   { // LBL_CS2_UDP
     [LANG_ENGLISH] = "UDP",
@@ -756,6 +850,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Zubehor: MM+DCC",
     [LANG_CZECH]   = "Prisl.: MM + DCC",
     [LANG_FRENCH]  = NULL,
+    [LANG_DUTCH]   = NULL,
   },
   { // LBL_CS2_UID
     [LANG_ENGLISH] = "UID",
@@ -767,6 +862,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Faktor",
     [LANG_CZECH]   = "Faktor",
     [LANG_FRENCH]  = "Facteur",
+    [LANG_DUTCH]   = "Faktor",
   },
   { // LBL_NXT_TRAIN
     [LANG_ENGLISH] = "Next train",
@@ -775,6 +871,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Nachster Zug",
     [LANG_CZECH]   = "Dalsi vlak",
     [LANG_FRENCH]  = "Prochain train",
+    [LANG_DUTCH]   = "Volgende trein",
   },
   { // LBL_ROUND
     [LANG_ENGLISH] = "Round",
@@ -783,6 +880,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Runde",
     [LANG_CZECH]   = "Kolo",
     [LANG_FRENCH]  = "Manche",
+    [LANG_DUTCH]   = "Ronde",
   },
   { // LBL_GAME
     [LANG_ENGLISH] = "Game",
@@ -791,6 +889,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Spiel",
     [LANG_CZECH]   = "Hra",
     [LANG_FRENCH]  = "Jeu",
+    [LANG_DUTCH]   = "Spel",
   },
   { // LBL_NXT_INSTR
     [LANG_ENGLISH] = "Transport passengers and\ngoods with your trains\naccording to the order cards",
@@ -799,6 +898,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Befordern Sie Passagiere\nund Guter mit Ihren Zugen\ngemass den Auftragskarten.",
     [LANG_CZECH]   = "Prepravujte cestujici a\nzbozi svymi vlaky dle\nobjednavkovych listku",
     [LANG_FRENCH]  = "Transportez passagers et\nmarchandises avec vos trains\nconformement aux bons de\ncommande",
+    [LANG_DUTCH]   = "Vervoer passagiers en\ngoederen met uw treinen\nvolgens de orderkaarten",
   },
   { // LBL_FROM
     [LANG_ENGLISH] = "From",
@@ -807,6 +907,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Von",
     [LANG_CZECH]   = "Z",
     [LANG_FRENCH]  = "Origine",
+    [LANG_DUTCH]   = "Van",
   },
   { // LBL_TO
     [LANG_ENGLISH] = "To",
@@ -815,6 +916,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Nach",
     [LANG_CZECH]   = "Do",
     [LANG_FRENCH]  = "Destination",
+    [LANG_DUTCH]   = "Bestemming",
   },
   { // LBL_ERR_NAME
     [LANG_ENGLISH] = "Name not\nfound!",
@@ -823,6 +925,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Name nicht\ngefunden!",
     [LANG_CZECH]   = "Jmeno\nnenalezeno!",
     [LANG_FRENCH]  = "Nom\nintrouvable!",
+    [LANG_DUTCH]   = "Naam niet\ngevonden!",
   },
   { // LBL_MENU_AUTO
     [LANG_ENGLISH] = "Automation",
@@ -831,16 +934,24 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_GERMAN]  = "Automatisier",
     [LANG_CZECH]   = "Automatika",
     [LANG_FRENCH]  = "Automatisation",
+    [LANG_DUTCH]   = "Automatisch",
   },
-    { // LBL_AUTOMATION
+  { // LBL_AUTOMATION
     [LANG_ENGLISH] = "Automation",
     [LANG_SPANISH] = "Automatizacion",
     [LANG_CATALAN] = "Automatitzar",
     [LANG_GERMAN]  = "Automatisier",
     [LANG_CZECH]   = "Automatika",
     [LANG_FRENCH]  = "Automatisation",
+    [LANG_DUTCH]   = "Automatisch",
   },
-      { // LBL_AUTO
+  { // LBL_AUTO
     [LANG_ENGLISH] = "Auto.",
+  },
+  { // LBL_MOMENTARY
+    [LANG_ENGLISH] = "Moment.",
+  },
+  { // LBL_FTP
+    [LANG_ENGLISH] = "FTP server",
   },
 };

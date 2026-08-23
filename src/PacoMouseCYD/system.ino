@@ -192,11 +192,12 @@ initResult initSequence() {                                       // Performs in
   barData[BAR_INIT].value = 90;
   drawObject(OBJ_BAR, BAR_INIT);
   if (WiFi.status() == WL_CONNECTED) {                            // Connect to server with current protocol
+    myLocalIP = WiFi.localIP();
     drawObject(OBJ_DRAWSTR, DSTR_INIT_STAT);                      // show Protocol
     getLabelTxt(LBL_SEL_Z21 + wifiSetting.protocol, label);
     tft.drawString(label, 20, 120, GFXFF);
     DEBUG_MSG("Channel: %d", WiFi.channel());
-    DEBUG_MSG("IP address: %u.%u.%u.%u", WiFi.localIP().operator[](0), WiFi.localIP().operator[](1), WiFi.localIP().operator[](2), WiFi.localIP().operator[](3));
+    DEBUG_MSG("IP address: %u.%u.%u.%u", myLocalIP[0], myLocalIP[1], myLocalIP[2], myLocalIP[3]);
     DEBUG_MSG("%s", WiFi.macAddress().c_str())
     useID = false;
     switch (wifiSetting.protocol) {
@@ -499,22 +500,26 @@ void wifiAnalyzer() {
 
 
 void wifiProcess() {
-  switch (wifiSetting.protocol) {
-    case CLIENT_Z21:
-      processZ21();
-      break;
-    case CLIENT_XNET:
-      processXnet();
-      break;
-    case CLIENT_LNET:
-      processLnet();
-      break;
-    case CLIENT_ECOS:
-      processECoS();
-      break;
-    case CLIENT_CS2:
-      processCS2();
-      break;
+  if (runServerFTP)
+    ftpSrv.handleFTP();
+  else {
+    switch (wifiSetting.protocol) {
+      case CLIENT_Z21:
+        processZ21();
+        break;
+      case CLIENT_XNET:
+        processXnet();
+        break;
+      case CLIENT_LNET:
+        processLnet();
+        break;
+      case CLIENT_ECOS:
+        processECoS();
+        break;
+      case CLIENT_CS2:
+        processCS2();
+        break;
+    }
   }
 }
 

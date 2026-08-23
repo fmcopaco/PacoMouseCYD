@@ -251,7 +251,7 @@ void openWindow(uint16_t id) {
       break;
     case WIN_ABOUT:
       snprintf (aboutPacoMouseCYD, PWD_LNG + 1, "v%s.%s%s", VER_H, VER_L, VER_R);
-      snprintf (aboutIP,  PWD_LNG + 1, "IP:  %u.%u.%u.%u", WiFi.localIP().operator[](0), WiFi.localIP().operator[](1), WiFi.localIP().operator[](2), WiFi.localIP().operator[](3));
+      snprintf (aboutIP,  PWD_LNG + 1, "IP:  %u.%u.%u.%u", myLocalIP[0], myLocalIP[1], myLocalIP[2], myLocalIP[3]);
       snprintf (aboutMAC, PWD_LNG + 1, "MAC: %s", WiFi.macAddress().c_str());
       winData[WIN_ABOUT].h = 220;
       createObject(OBJ_WIN, WIN_ABOUT);
@@ -283,6 +283,7 @@ void openWindow(uint16_t id) {
         sprintf (locoEditProt, "DCC");
       for (n = 0; n < 29; n++)
         fncData[FNC_F0 + n].idIcon = locoData[myLocoData].myFuncIcon[n];
+      fncMomentEdit = locoData[myLocoData].myMomentFunc;
       createObject(OBJ_WIN, WIN_LOK_EDIT);
       createObject(OBJ_LABEL, LBL_ADDR);
       createObject(OBJ_LABEL, LBL_IMAGE);
@@ -332,6 +333,8 @@ void openWindow(uint16_t id) {
       createObject(OBJ_WIN, WIN_CHG_FUNC);
       createObject(OBJ_FNC, FNC_CHG);
       createObject(OBJ_TXT, TXT_EDIT_FNC);
+      createObject(OBJ_LABEL, LBL_MOMENTARY);
+      createObject(OBJ_SWITCH, SW_MOMENTARY);
       newEvent(OBJ_WIN, WIN_CHG_FUNC, EVNT_DRAW);
       break;
     case WIN_VMAX:
@@ -597,6 +600,8 @@ void openWindow(uint16_t id) {
       createObject(OBJ_BUTTON, BUT_UTL_T_STA);
       createObject(OBJ_BUTTON, BUT_UTL_I_NXT);
       createObject(OBJ_BUTTON, BUT_UTL_T_NXT);
+      createObject(OBJ_BUTTON, BUT_UTL_I_REMOTE);
+      createObject(OBJ_BUTTON, BUT_UTL_T_REMOTE);
       createObject(OBJ_ICON, ICON_UTL_EXIT);
       createObject(OBJ_DRAWSTR, DSTR_UTL_MENU);
       newEvent(OBJ_WIN, WIN_UTIL, EVNT_DRAW);
@@ -1139,6 +1144,19 @@ void openWindow(uint16_t id) {
       createObject(OBJ_BUTTON, BUT_TYPE_OK);
       createObject(OBJ_BUTTON, BUT_TYPE_CNCL);
       newEvent(OBJ_WIN, WIN_ROUTE_EDIT, EVNT_DRAW);
+      break;
+    case WIN_FTP:
+      createObject(OBJ_WIN, WIN_FTP);
+      createObject(OBJ_LABEL, LBL_FTP);
+      createObject(OBJ_DRAWSTR, DSTR_FTP);
+      createObject(OBJ_TXT, TXT_FTP);
+      createObject(OBJ_TXT, TXT_FTP_FILE);
+      createObject(OBJ_FNC, FNC_SCAN_RESET);
+      createObject(OBJ_ICON, ICON_FTP_WIFI);
+      createObject(OBJ_ICON, ICON_FTP_SD);
+      createObject(OBJ_ICON, ICON_FTP_DIR);
+      createObject(OBJ_FNC, FNC_FTP_USER);
+      newEvent(OBJ_WIN, WIN_FTP, EVNT_DRAW);
       break;
   }
 }

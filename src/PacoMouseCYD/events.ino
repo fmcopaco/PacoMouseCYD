@@ -193,6 +193,45 @@ void eventProcess() {
       }
 #endif
       break;
+    case EVNT_RELEASE:
+      if (event.objType == OBJ_DATA) {
+        switch (event.objID) {
+          case DATA_SW_BOOT:
+            doActionRelease(actionSW_BOOT);
+            break;
+          case DATA_SW_R:
+            doActionRelease(actionSW_R);
+            break;
+          case DATA_SW_G:
+            doActionRelease(actionSW_G);
+            break;
+          case DATA_SW_B:
+            doActionRelease(actionSW_B);
+            break;
+        }
+      }
+      break;
+    case EVNT_NOTOUCH:
+      if (event.objType == OBJ_FNC) {
+        switch (event.objID) {
+          case FNC_FX0:
+          case FNC_FX1:
+          case FNC_FX2:
+          case FNC_FX3:
+          case FNC_FX4:
+          case FNC_FX5:
+          case FNC_FX6:
+          case FNC_FX7:
+          case FNC_FX8:
+          case FNC_FX9:
+            value = fncData[event.objID].num;
+            if (value < 29) {
+              releaseFunction(value, event.objID);                       // Function Fx
+            }
+            break;
+        }
+      }
+      break;
     case EVNT_CLICK:
       aliveAndKicking();
       switch (event.objType) {
@@ -408,6 +447,7 @@ void eventProcess() {
               snprintf (locoData[myLocoData].myName, NAME_LNG + 1, locoEditName);
               for (n = 0; n < 29; n++)
                 locoData[myLocoData].myFuncIcon[n] = fncData[FNC_F0 + n].idIcon;
+              locoData[myLocoData].myMomentFunc = fncMomentEdit;
               locoData[myLocoData].myVmax = atoi(locoEditVmax);
               if (wifiSetting.protocol != CLIENT_ECOS)
                 locoData[myLocoData].myLocoID = atoi(locoEditID);
@@ -657,6 +697,22 @@ void eventProcess() {
                 openWindow(WIN_PLAY_NEXT);
               else
                 openWindow(WIN_NEXT_TRAIN);
+              break;
+            case BUT_UTL_I_REMOTE:
+            case BUT_UTL_T_REMOTE:
+              if (sdDetected) {
+                ftpSrv.begin();
+                runServerFTP = true;
+                sprintf(ftpCredentialsBuf, "User:  paco|Pass:  mouse|IP:      %d.%d.%d.%d||ftp://paco:mouse@%d.%d.%d.%d/",
+                        myLocalIP[0], myLocalIP[1], myLocalIP[2], myLocalIP[3],
+                        myLocalIP[0], myLocalIP[1], myLocalIP[2], myLocalIP[3]);
+                ftpCurrFileBuf[0] = '\0';
+                fncData[FNC_FTP_USER].idIcon = FNC_BLANK_OFF;
+                iconData[ICON_FTP_DIR].color = COLOR_GHOST_WHITE;
+                openWindow(WIN_FTP);
+              }
+              else
+                alertWindow(ERR_FILE);
               break;
             case BUT_STEAM_CNCL:
               updateSpeedHID();                 // set encoder
@@ -1276,6 +1332,7 @@ void eventProcess() {
                 paramChild = event.objID - FNC_F0;
                 snprintf(locoEditFunc, ADDR_LNG, "F%d", paramChild);
                 fncData[FNC_CHG].idIcon = fncData[FNC_F0 + paramChild].idIcon;
+                switchData[SW_MOMENTARY].state = bitRead(fncMomentEdit, paramChild);
                 encoderValue = fncData[FNC_CHG].idIcon >> 1;
                 encoderMax = FNC_ICON_MAX;
                 openWindow(WIN_CHG_FUNC);
@@ -1649,6 +1706,10 @@ void eventProcess() {
               bitWrite(optionsCS2, event.objID - SW_OPT_CS2_BOOT, switchData[event.objID].state);
               EEPROM.write(EE_CS2, optionsCS2);
               eepromChanged = true;
+              break;
+            case SW_MOMENTARY:
+              clickSwitch(event.objID);
+              bitWrite(fncMomentEdit, paramChild, switchData[SW_MOMENTARY].state);
               break;
           }
           break;

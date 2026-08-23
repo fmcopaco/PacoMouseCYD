@@ -68,6 +68,7 @@ void clearEventStack() {                                // clear pending events
   eventIn = 0;
   eventOut = 0;
   eventsPending = 0;
+  lastObject = OBJ_UNDEF;
 }
 
 wEvent getEvent() {                                     // get event from stack
@@ -220,6 +221,8 @@ void sendClickEvent(uint16_t x, uint16_t y) {
       newEvent(objStack[pos].objType, id, EVNT_CLICK);
       lastClickX = x;
       lastClickY = y;
+      lastObject = objStack[pos].objType;
+      lastObjectID = id;
       return;
     }
     if ((pos == lastWinStack) && isModalWindow(objStack[lastWinStack].objID))   // With Modal window only cliks inside last window are valid
@@ -228,7 +231,12 @@ void sendClickEvent(uint16_t x, uint16_t y) {
   }
 }
 
-
+void releaseTouchEvent() {
+  if (lastObject != OBJ_UNDEF) {
+    newEvent(lastObject, lastObjectID, EVNT_NOTOUCH);
+    lastObject = OBJ_UNDEF;
+  }
+}
 
 ////////////////////////////////////////////////////////////
 // ***** GRAPHIC OBJECT STACK *****

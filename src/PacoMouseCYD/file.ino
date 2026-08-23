@@ -52,6 +52,9 @@ bool saveLocoData(fs::FS &fs, uint16_t pos) {                           // save 
     myFile.print(CSV_FILE_DELIMITER);
     getLabelTxt(LBL_PROTOCOL, field);
     myFile.print(field);
+    myFile.print(CSV_FILE_DELIMITER);
+    getLabelTxt(LBL_MOMENTARY, field);
+    myFile.print(field);
     myFile.print("\r\n");
     myFile.print(locoData[pos].myName);                   // Loco data
     myFile.print(CSV_FILE_DELIMITER);
@@ -64,6 +67,8 @@ bool saveLocoData(fs::FS &fs, uint16_t pos) {                           // save 
     }
     myFile.print(CSV_FILE_DELIMITER);
     myFile.print(locoData[pos].myProtocol);
+    myFile.print(CSV_FILE_DELIMITER);
+    myFile.print(locoData[pos].myMomentFunc);
     myFile.print("\r\n");
     myFile.close();
     dataOK = true;
@@ -109,6 +114,7 @@ bool readLocoData(fs::FS &fs, uint16_t num, uint16_t pos) {            // read l
               //DEBUG_MSG("Func: %d - %d", n, locoData[pos].myFuncIcon[n])
             }
             locoData[pos].myProtocol = readCSV(myFile, line, sizeof(line), true) ? atoi(line) : LOK_DCC;
+            locoData[pos].myMomentFunc = readCSV(myFile, line, sizeof(line), true) ? atoi(line) : 0;
             locoData[pos].myAddr.address = num;
             dataOK = true;
           }

@@ -80,35 +80,27 @@ void readButtons () {
   inputButton = digitalRead (SW_BOOT_PIN);                            // comprueba cambio en boton BOOT
   if (statusBOOT != inputButton) {
     statusBOOT = inputButton;
-    if (statusBOOT == LOW) {
-      newEvent(OBJ_DATA, DATA_SW_BOOT, EVNT_PRESS);
-      DEBUG_MSG("BOOT switch pressed...")
-    }
+    newEvent(OBJ_DATA, DATA_SW_BOOT, (statusBOOT == LOW) ? EVNT_PRESS : EVNT_RELEASE);
+    DEBUG_MSG("BOOT switch ...")
   }
 #if (USE_RGB_LED == FUNC_BUTTONS)
   inputButton = digitalRead (RGB_LED_R);                            // comprueba cambio en boton BOOT
   if (statusSW_R != inputButton) {
     statusSW_R = inputButton;
-    if (statusSW_R == LOW) {
-      newEvent(OBJ_DATA, DATA_SW_R, EVNT_PRESS);
-      DEBUG_MSG("R switch pressed...")
-    }
+    newEvent(OBJ_DATA, DATA_SW_R, (statusSW_R == LOW) ? EVNT_PRESS : EVNT_RELEASE);
+    DEBUG_MSG("R switch ...")
   }
   inputButton = digitalRead (RGB_LED_G);                            // comprueba cambio en boton BOOT
   if (statusSW_G != inputButton) {
     statusSW_G = inputButton;
-    if (statusSW_G == LOW) {
-      newEvent(OBJ_DATA, DATA_SW_G, EVNT_PRESS);
-      DEBUG_MSG("G switch pressed...")
-    }
+    newEvent(OBJ_DATA, DATA_SW_G, (statusSW_G == LOW) ? EVNT_PRESS : EVNT_RELEASE);
+    DEBUG_MSG("G switch ...")
   }
   inputButton = digitalRead (RGB_LED_B);                            // comprueba cambio en boton BOOT
   if (statusSW_B != inputButton) {
     statusSW_B = inputButton;
-    if (statusSW_B == LOW) {
-      newEvent(OBJ_DATA, DATA_SW_B, EVNT_PRESS);
-      DEBUG_MSG("B switch pressed...")
-    }
+    newEvent(OBJ_DATA, DATA_SW_B, (statusSW_B == LOW) ? EVNT_PRESS : EVNT_RELEASE);
+    DEBUG_MSG("B switch ...")
   }
 #endif
 }
@@ -397,7 +389,10 @@ void doAction(uint8_t actionSW) {
       break;
     default:                                        // Function key
       n = actionSW - ACT_F0;
-      locoData[myLocoData].myFunc.Bits ^= bit(n);
+      if (bitRead(locoData[myLocoData].myMomentFunc, n))
+        bitSet(locoData[myLocoData].myFunc.Bits, n);        // momentary
+      else
+        locoData[myLocoData].myFunc.Bits ^= bit(n);         // latched
       funcOperations(n);
       updateFuncState(isWindow(WIN_THROTTLE));
       break;
@@ -420,4 +415,16 @@ uint8_t prevAction (uint8_t actionSW, uint8_t pos, uint16_t txt) {
     newEvent(OBJ_TXT, txt, EVNT_DRAW);
   }
   return actionSW;
+}
+
+void doActionRelease(uint8_t actionSW) {
+  uint8_t n;
+  if (actionSW >= ACT_F0) {
+    n = actionSW - ACT_F0;
+    if (bitRead(locoData[myLocoData].myMomentFunc, n)) {
+      bitClear(locoData[myLocoData].myFunc.Bits, n);        // momentary
+      funcOperations(n);
+      updateFuncState(isWindow(WIN_THROTTLE));
+    }
+  }
 }

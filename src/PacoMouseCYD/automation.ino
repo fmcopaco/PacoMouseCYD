@@ -14,6 +14,8 @@
   R     New route start
   r     Loop (this route)
   C     Call other route
+  H     Fast Clock time
+  M     Fast Clock minute
   X     End
 */
 
@@ -82,6 +84,8 @@ char getOpcode(char *buf, uint16_t *pos, uint16_t *value) {                     
     case 'z':
     case 'R':
     case 'C':
+    case 'H':
+    case 'M':
       cnt++;
       *value = getOpcodeParameter(buf, &cnt);
       break;
@@ -161,6 +165,16 @@ void showOpcodes(uint16_t pos) {                                                
         showOpcodeButton(n, AUTO_D, value);
         txtData[TXT_AUTO_OPC0 + n].font = (value > 999) ? FSSB6 : FSSB9;
         sprintf(autoOpcodeBuf[n], "%d.%d", value / 10, value % 10);
+        break;
+      case 'H':
+        showOpcodeButton(n, AUTO_H, value);
+        txtData[TXT_AUTO_OPC0 + n].font = FSSB6;
+        sprintf(autoOpcodeBuf[n], "%02d:%02d", value / 100, value % 100);
+        break;
+      case 'M':
+        showOpcodeButton(n, AUTO_M, value);
+        txtData[TXT_AUTO_OPC0 + n].font = FSSB6;
+        sprintf(autoOpcodeBuf[n], "--:%02d", value);
         break;
       case 'T':
         showOpcodeButton(n, AUTO_T, value);
@@ -324,6 +338,12 @@ void showConvertValue (char opc, uint16_t value) {
   switch (opc) {
     case 'D':                                                                     // delay
       snprintf(autoConvBuf, ACC_LNG + 1, "%d.%ds", value / 10, value % 10);
+      break;
+    case 'H':                                                                     // fast clock time HH:MM
+      snprintf(autoConvBuf, ACC_LNG + 1, "%02d:%02d", value / 100, value % 100);
+      break;
+    case 'M':                                                                     // fast clock minute --:MM
+      snprintf(autoConvBuf, ACC_LNG + 1, "--:%02d", value);
       break;
     case 'Z':                                                                     // feedback
     case 'z':
@@ -532,7 +552,7 @@ void automationProcess() {
   if (currAutomation >= MAX_AUTO_SEQ)
     currAutomation = 0;
   if (automation[currAutomation].num > 0) {                                       // only runing sequences
-    switch (automation[currAutomation].opcode) {                                  // check waiting opcodes (delay, feedback, loco change)
+    switch (automation[currAutomation].opcode) {                                  // check waiting opcodes (delay, feedback, loco change, time)
       case 'D':
       case 'L':
         if ((automation[currAutomation].value) > 0)                               // wait to complete delay
@@ -552,6 +572,18 @@ void automationProcess() {
           if (automation[pos].num == automation[currAutomation].param)
             return;
         }
+        break;
+      case 'H':                                                                   // waiting to fast clock time
+        pos = automation[currAutomation].value % 100;
+        if (pos != clockMin)
+          return;
+        pos = automation[currAutomation].value / 100;
+        if (pos != clockHour)
+          return;
+        break;
+      case 'M':                                                                   // waiting to fast clock minute
+        if (automation[currAutomation].value != clockMin)
+          return;
         break;
     }
     automation[currAutomation].opcode =  getOpcode(automation[currAutomation].opcodes, &automation[currAutomation].currStep, &automation[currAutomation].param);
@@ -602,6 +634,8 @@ void automationProcess() {
           autoSetSpeed(param);                                                    // 0..100
         break;
       case 'D':                                                                   // delay
+      case 'H':                                                                   // fast clock time
+      case 'M':                                                                   // fast clock minute
         automation[currAutomation].value = param;
         break;
       case 'T':
@@ -609,21 +643,21 @@ void automationProcess() {
         if (param < 2048)
           moveAccessory (param, (uint8_t)(automation[currAutomation].opcode == 'T'));
         break;
-      case 'r':                                                                 // loop
+      case 'r':                                                                   // loop
         automation[currAutomation].currStep = 0;
         break;
       case 'R':
         if ((param > 0) && (param <= AUTOMATION_MAX))
-          startAutomation(param);                                               // route
+          startAutomation(param);                                                 // route
         break;
-      case 'C':                                                                 // call
+      case 'C':                                                                   // call
         if ((param > 0) && (param <= AUTOMATION_MAX))
           automation[currAutomation].value = startAutomation(param) ? findAutomation(param) : MAX_AUTO_SEQ;
         break;
       case 'X':
-        stopAutomation(automation[currAutomation].num);                         // end
+        stopAutomation(automation[currAutomation].num);                           // end
         break;
-      case 'Z':                                                                 // feedback
+      case 'Z':                                                                   // feedback
       case 'z':
         automation[currAutomation].value = (automation[currAutomation].opcode == 'Z') ? 0x0000 : 0xFFFF;
         queryFeedback(param);

@@ -109,6 +109,72 @@ span[lang=es], span[lang=de], span[lang=ca], span[lang=cz],{ display: none}
   border-radius: 5;
   -webkit-appearance: none;}
   
+  /* The container */
+.container {
+display: block;
+position: relative;
+padding-left: 35px;
+margin-bottom: 12px;
+cursor: pointer;
+font-size: 25px;
+-webkit-user-select: none;
+-moz-user-select: none;
+-ms-user-select: none;
+user-select: none;
+}
+
+/* Hide the browser"s default checkbox */
+.container input {
+position: absolute;
+opacity: 0;
+cursor: pointer;
+}
+
+/* Create a custom checkbox */
+.checkmark {
+position: absolute;
+top: 0;
+left: 0;
+height: 30px;
+width: 30px;
+background-color: grey;
+}
+
+/* On mouse-over, add a grey background color */
+.container:hover input ~ .checkmark {
+background-color: lightblue;
+}
+
+/* When the checkbox is checked, add a blue background */
+.container input:checked ~ .checkmark {
+background-color: #2196F3;
+}
+
+/* Create the checkmark/indicator (hidden when not checked) */
+.checkmark:after {
+content: "";
+position: absolute;
+display: none;
+}
+
+/* Show the checkmark when checked */
+.container input:checked ~ .checkmark:after {
+display: block;
+}
+
+/* Style the checkmark/indicator */
+.container .checkmark:after {
+left: 9px;
+top: 5px;
+width: 5px;
+height: 10px;
+border: solid white;
+border-width: 0 3px 3px 0;
+-webkit-transform: rotate(45deg);
+-ms-transform: rotate(45deg);
+transform: rotate(45deg);
+}
+  
   img.english {    
   content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEMAAAAlCAMAAAAuuaQGAAAAn1BMVEUAIXOUlJS1tbWMjIzOzs7v7++lpaW9ECH////n5+cYOYT39/cAFk7GKTkAG10xSpT/9/eura3WZGy1vdb33t7a2trOQkyACxbjmKFCWpy9xt6ZDRvGITHejJS9vb3vtb0pQoyltc7Hx8ecpc73ztbOWmOWmKFNZZ/Q2OkYL2h+hJkpPHOiKDKYRU21f4UQJ1pje62GGSSXX2T35+eUtYylz95fAAABl0lEQVRIx+3Wy1aDMBAG4EADDKVQ0gr0olSr0kIvtvX9382EAiFhWMjRc1z4ryCT860mmZAToyLZIdBC6XEtQqleyovtmdeOZ7iHrJ33t/JrPiVKAHxHBEAtjF/DBa/EG2CeCDfO/B9VcEMKAMx1XYsjJCvXEAUz2gKAQaNIICR4fsGVrqEK+90kTbcCIQEhuKIbukDIxGYmR0oDV1SjK3DDyFjaGJjSNjCBGyPDTqk0uoo0dqhwN0zqWiQfN1mu+F7fn31WvVMbsIl9vxLci9z/URsUetMYPWE/aaydwUn+jd8z/kp/KL1elh5mcVx2tmKEC776FO53SK+3zlwlOM7jU7haSuMyVyudMxfggnr2p6iiGl1Bv4MwpW1gQvcu7CrSwAXsTtaVxshwAZ8NqlK0+wMR+mZUW7lJAxX6Z6VUml63T0lyvdnFYaKFsWsiwliuVfKCiWSn2vA8l6a2MRqUajaA50Ypy4xBqWaUMLYmswelmpXgWRxJU3NA6pkNnkAiOijV2wFKZHDKNwwIRMT6drzqLfUF+1ZZIabdy3UAAAAASUVORK5CYII=);
   width: 67px;   height: 37px;}
@@ -447,13 +513,28 @@ img.paco {
 <div id="iconAll" style="display:none">
 <hr>
 <table>
-<tr><td>
+<tr>
+<td>
   <span lang="es">Icono para</span>
   <span lang="ca">Icona per a</span>
   <span lang="en">Icon for</span>
   <span lang="de">Symbol f&uuml;r</span>
   <span lang="cz">Symbol pro</span>
-</td><td id="Fx">F</td></tr>
+</td>
+<td id="Fx">F</td>
+<td></td>
+<td>
+<label class="container" align="left">
+  <span lang="es">Funci&oacute;n Moment&aacute;nea</span>
+  <span lang="ca">Funci&oacute; Moment&agrave;nia</span>
+  <span lang="en">Momentary function</span>
+  <span lang="de">Momentanfunktion</span>
+  <span lang="cz">Moment&aacute;ln&iacute; funkce</span>
+<input type="checkbox" id="FncMom" onClick="updateMomentary();">
+<span class="checkmark"></span>
+</label>
+</td>
+</tr>
 </table>
 <br>
 <table>
@@ -530,6 +611,8 @@ if (window.File && window.FileReader && window.FileList && window.Blob) {
   alert("File APIs are not fully supported in this browser.");
 }
  
+ var momentary = 0;
+ 
 function saveTextAsFile()
 {
     var textToSave = document.getElementById("inputTextToSave").value;
@@ -577,6 +660,7 @@ function destroyClickedElement(event)
 	}
 	field = document.getElementById("protocol-select");
 	field.selectedIndex = information[32];
+	momentary = information[33];
 	var imgSrc = document.getElementById("imageToShow");
     imgSrc.src = "image/" + information[1] + ".bmp";
 }  
@@ -650,8 +734,23 @@ function selectIcon(value)
 	var iconFunc = document.getElementById('Fx');
 	const iconText = "F" + value;
 	iconFunc.innerHTML = iconText;
+	var ck = document.getElementById("FncMom");
+	if (momentary & (1 << value))
+	    ck.checked = true;
+	else
+	    ck.checked = false;
 }  
 
+function updateMomentary() {
+   var funcNum = document.getElementById('NumFunc').value;
+   var ck = document.getElementById("FncMom").checked;
+   if (ck == true) {
+       momentary = momentary | (1 << funcNum);
+   }
+   else {
+       momentary = momentary & (~(1 << funcNum));
+   }
+}
 
 function updateIcon(value) 
 {
@@ -675,7 +774,7 @@ function createTextCSV()
 {
     var fileNameToSaveAs = document.getElementById("inputFileNameToSaveAs")
     var textToSave = document.getElementById("inputTextToSave");
-    var textCSV = "Name;Image;Vmax;F0;F1;F2;F3;F4;F5;F6;F7;F8;F9;F10;F11;F12;F13;F14;F15;F16;F17;F18;F19;F20;F21;F22;F23;F24;F25;F26;F27;F28;Protocol\n";
+    var textCSV = "Name;Image;Vmax;F0;F1;F2;F3;F4;F5;F6;F7;F8;F9;F10;F11;F12;F13;F14;F15;F16;F17;F18;F19;F20;F21;F22;F23;F24;F25;F26;F27;F28;Protocol;Moment.\n";
 	var loco = document.getElementById("NumLoco");
     var field = document.getElementById("NameLoco");
 	var funcName;
@@ -700,6 +799,7 @@ function createTextCSV()
 		field = document.getElementById("protocol-select");
 		var x =field.selectedIndex;
 		textCSV = textCSV + ";" + x;
+		textCSV = textCSV + ";" + momentary;
         textCSV = textCSV + "\n"
         textToSave.value = textCSV;
     	fileNameToSaveAs.value = loco.value;

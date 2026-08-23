@@ -109,7 +109,7 @@ uint16_t lastWinStack;
 // ***** EVENT *****
 ////////////////////////////////////////////////////////////
 
-enum EventGUI {EVNT_CLICK, EVNT_DRAW, EVNT_WOPEN, EVNT_WCLOSE, EVNT_TIMER, EVNT_PRESS};
+enum EventGUI {EVNT_CLICK, EVNT_NOTOUCH, EVNT_DRAW, EVNT_WOPEN, EVNT_WCLOSE, EVNT_TIMER, EVNT_PRESS, EVNT_RELEASE};
 
 typedef struct {                                        // Events
   uint16_t  objType;
@@ -123,6 +123,8 @@ uint16_t  eventOut;
 uint16_t  eventsPending;
 uint16_t  lastClickX;
 uint16_t  lastClickY;
+uint16_t  lastObject;
+uint16_t  lastObjectID;
 
 
 ////////////////////////////////////////////////////////////

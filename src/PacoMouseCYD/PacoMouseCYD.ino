@@ -36,16 +36,17 @@
        v0.11    18mar26   Changes in config.h for easy setup. Tapping gauge controls speed. Added French language. Check WLAN connection. Battery level. Changes in encoder.
        v0.12    16apr26   Added CS2 protocol. Gauge angle compensation in 28 steps. Added some function icons. Button actions for emergency stop & brake. Added Next train: Car cards & waybills game.
        v0.13    27jun26   Automation added. Get MFX loco UID. Lower ESP32 frequency when idle to save battery.
+       v0.14    13aug26   Momentary functions. Added fast clock opcodes to automation. Added simple FTP server for SD remote access.Added Dutch language.
 */
 
 // PacoMouseCYD program version
 #define VER_H "0"
-#define VER_L "13"
-#define VER_R "b"
+#define VER_L "14"
+#define VER_R "c"
 
 
 //#define DEBUG                                               // Descomentar para mensajes de depuracion
-//#define SCREEN_SEND                                         // Reads a screen image off the TFT and send it to a processing client sketch over the serial port https://github.com/Bodmer/TFT_eSPI
+//#define SCREEN_SEND                                         // Reads a screen image off the TFT and saves to SD when pressing BOOT button.
 
 // Libraries
 
@@ -63,6 +64,8 @@
 #include <EEPROM.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <WiFiClient.h>
+#include "ftpServerPM.h"                                    // PacoMouseCYD FTP server
 #include "lnet.h"                                           // PacoMouseCYD LNTCP
 #include <Update.h>
 
@@ -206,6 +209,8 @@ enum typeProto {CLIENT_Z21, CLIENT_XNET, CLIENT_ECOS, CLIENT_CS2, CLIENT_LNET};
 WiFiClient Client;
 WiFiUDP Udp;
 
+IPAddress  myLocalIP;                                       // IP address of client (PacoMouseCYD)
+
 #define z21Port   21105                                     // local port to listen on command station
 #define XnetPort   5550
 #define ECoSPort  15471
@@ -242,6 +247,9 @@ uint8_t scan_count = 0;
 uint8_t ap_count[14];
 int32_t max_rssi[14];
 bool signalLost;
+
+FtpServer ftpSrv;
+bool runServerFTP;
 
 ////////////////////////////////////////////////////////////
 // ***** GUI *****
@@ -329,6 +337,7 @@ typedef struct {
   uint16_t  myLocoID;                                       // ID / picture
   uint8_t   myFuncIcon[30];
   uint8_t   myProtocol;
+  uint32_t  myMomentFunc;
 } lokData;
 
 lokData   locoData[LOCOS_IN_STACK];                         // Loco data
@@ -340,6 +349,8 @@ bool useID;
 
 #define MAX_LOCO_IMAGE sizeof(locoImages) / sizeof(locoImages[0])
 uint16_t locoImageIndex;
+
+uint32_t fncMomentEdit;
 
 enum locoSort {SORT_LAST, SORT_NUM_UP, SORT_NUM_DWN, SORT_NAME_UP, SORT_NAME_DWN};
 uint16_t currOrder;
@@ -384,7 +395,7 @@ bool accPanelChanged;
 uint16_t myTurnout;
 
 enum accType {ACC_UNDEF, ACC_TURN_L, ACC_TURN_R, ACC_TRIPLE, ACC_CROSSING, ACC_DCROSS, ACC_BETRELLE, ACC_SIGNAL2, ACC_SIGNAL3, ACC_SIGNAL4, ACC_SEM2, ACC_SEM3,
-              ACC_PAN, ACC_TT_L, ACC_TT_R, ACC_TT_TRK, ACC_TT_TURN, ACC_LIGHT, ACC_SOUND, ACC_POWER, ACC_KEYPAD, ACC_SWITCH, ACC_ROUTE, ACC_MAX,
+              ACC_PAN, ACC_TT_L, ACC_TT_R, ACC_TT_TRK, ACC_TT_TURN, ACC_LIGHT, ACC_SOUND, ACC_POWER, ACC_KEYPAD, ACC_SWITCH, ACC_ROUTE, ACC_SPERRE, ACC_MAX,
              };
 
 typedef struct {
@@ -423,6 +434,7 @@ const accObj accDef[ACC_MAX] = {
   { 1, 99, {{FNC_KEYPAD_OFF, COLOR_BLACK, COLOR_YELLOW},       {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_KEYPAD
   { 2, 99, {{FNC_SWO_OFF, COLOR_BLACK, COLOR_RED},             {FNC_SWC_OFF, COLOR_BLACK, COLOR_GREEN},           {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SWITCH
   { 2, 99, {{FNC_ROUTE_OFF, COLOR_BLACK, COLOR_BLUE},          {FNC_ROUTE_RUN_OFF, COLOR_BLACK, COLOR_RED},       {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_ROUTE
+  { 2, 99, {{FNC_SPERR_OFF, COLOR_BLACK, COLOR_WHITE},         {FNC_SPERG_OFF, COLOR_BLACK, COLOR_WHITE},         {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}, {FNC_BLANK_OFF, COLOR_LIGHTGREY, COLOR_LIGHTGREY}}}, // ACC_SPERRE
 };
 
 typedef struct {
@@ -434,7 +446,7 @@ typedef struct {
   uint16_t  activeOutput;                                   // '3A2G 3A2R 3A1G 3A1R  2A2G 2A2R 2A1G 2A1R  1A2G 1A2R 1A1G 1A1R  0A2G 0A2R 0A1G 0A1R'
 } panelElement;
 
-const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021, 0x4521, 0x0021, 0x0021, 0x0421, 0x8421, 0x0021, 0x0421, 0x0021, 0x0002, 0x0001, 0x0001, 0x0002, 0x0021, 0x0021, 0x0021, 0x0000, 0x0021, 0x0000};
+const uint16_t accOutDefault[ACC_MAX] = {0x0000, 0x0021, 0x0021, 0x0521, 0x0021, 0x4521, 0x0021, 0x0021, 0x0421, 0x8421, 0x0021, 0x0421, 0x0021, 0x0002, 0x0001, 0x0001, 0x0002, 0x0021, 0x0021, 0x0021, 0x0000, 0x0021, 0x0000, 0x0021};
 
 panelElement accPanel[16];
 panelElement currAccEdit;
@@ -463,7 +475,7 @@ bool addOpcode;
 uint8_t editType;
 uint16_t editValue;
 
-enum autoobj {AUTO_t, AUTO_T, AUTO_z, AUTO_Z, AUTO_L, AUTO_S, AUTO_f, AUTO_F, AUTO_l0, AUTO_l1, AUTO_l2, AUTO_l3, AUTO_D, AUTO_R, AUTO_C, AUTO_r, AUTO_X, AUTO_OBJ_MAX};
+enum autoobj {AUTO_t, AUTO_T, AUTO_z, AUTO_Z, AUTO_L, AUTO_S, AUTO_f, AUTO_F, AUTO_l0, AUTO_l1, AUTO_l2, AUTO_l3, AUTO_D, AUTO_R, AUTO_C, AUTO_r, AUTO_H, AUTO_M, AUTO_X, AUTO_OBJ_MAX};
 
 typedef struct {
   char opc;
@@ -489,6 +501,8 @@ const autoObj autoDef[AUTO_OBJ_MAX] = {                     // automation defaul
   {'R', 1, auto_jump, COLOR_BLACK},
   {'C', 1, auto_call, COLOR_BLACK},
   {'r', OBJ_NOT_FOUND, auto_loop, COLOR_BLACK},
+  {'H', 0, gameclock, COLOR_BLUE},
+  {'M', 0, auto_min, COLOR_BLACK},
   {'X', OBJ_NOT_FOUND, auto_end, COLOR_BLACK}
 };
 
@@ -948,7 +962,7 @@ uint16_t streamPosCS2;
 bool uidFound;
 bool isMFX;
 
-#define CS2_PING_INTERVAL 20000UL 
+#define CS2_PING_INTERVAL 20000UL
 
 ////////////////////////////////////////////////////////////
 // ***** MAIN PROGRAM *****
@@ -1011,6 +1025,7 @@ void setup() {
   openWindow(WIN_LOGO);                                     // special window, don't use events just draw
   initStatus = initSequence();
   getLastLoco();
+
 }
 
 
@@ -1026,8 +1041,10 @@ void loop() {
     DEBUG_MSG("New Event...")
   }
   if (clickDetected) {                                      // only individual clicks
-    if (! touchscreen.touched())
+    if (! touchscreen.touched()) {
       clickDetected = false;
+      releaseTouchEvent();
+    }
   }
   else {
     if (touchscreen.touched()) {
@@ -1171,6 +1188,7 @@ void initVariables() {
   currGame = currLanguage;
   maxConductor = 2;
   currConductor = 0;
+  runServerFTP = false;
 }
 
 

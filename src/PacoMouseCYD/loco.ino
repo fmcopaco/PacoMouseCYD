@@ -73,6 +73,7 @@ void clearLocoData (uint16_t pos) {
   locoData[pos].myAddr.address = 0;                         // clear loco data
   locoData[pos].myName[0] = '\0';
   locoData[pos].myFunc.Bits = 0;
+  locoData[pos].myMomentFunc = 0;
   locoData[pos].myDir = 0x80;
   locoData[pos].mySpeed = 0;
   locoData[pos].mySteps = DEFAULT_STEPS;
@@ -197,6 +198,15 @@ void toggleFunction(uint8_t fnc, uint8_t id) {
   fncData[id].state = bitRead(locoData[myLocoData].myFunc.Bits, fnc);
   funcOperations(fnc);
   newEvent(OBJ_FNC, id, EVNT_DRAW);
+}
+
+void releaseFunction(uint8_t fnc, uint8_t id) {
+  if (bitRead(locoData[myLocoData].myMomentFunc, fnc)) {
+    bitClear(locoData[myLocoData].myFunc.Bits, fnc);        // momentary
+    fncData[id].state = false;
+    funcOperations(fnc);
+    newEvent(OBJ_FNC, id, EVNT_DRAW);
+  }
 }
 
 void showFuncBlock(uint8_t fncOffset) {
