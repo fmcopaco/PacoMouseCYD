@@ -45,6 +45,8 @@ Firmware for a WiFi throttle to control locomotives and accessories using a [Che
 
   [![PacoMouseAutomation](https://img.youtube.com/vi/auRIvvbzx6Q/0.jpg)](https://www.youtube.com/watch?v=auRIvvbzx6Q)
 
+  [![PacoMouseFTP](https://img.youtube.com/vi/8pQvOYDjQLs/0.jpg)](https://www.youtube.com/watch?v=8pQvOYDjQLs)
+
 
 ---
 
