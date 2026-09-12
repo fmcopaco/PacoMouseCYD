@@ -12,5 +12,9 @@ Jindra Fučík - https://www.instructables.com/Building-the-PacoMouseCYD-DCC-Thr
 
 Hyta - https://www.printables.com/model/1702940-pacomousecyd-case/files
 
+Schnorpser - https://www.printables.com/model/1823800-pacomousecyd-housing
+
+
+
 
 
