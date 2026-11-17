@@ -154,7 +154,7 @@ void updateAccPanel() {
     buttonData[BUT_ACC_0 + n].backgnd = (type == ACC_UNDEF) ? COLOR_WHITE : COLOR_LIGHTGREY;
   }
   n = 30;
-  getLabelOption(n + 025, panelLabelBuf, 0);
+  getLabelOption(n + 026, panelLabelBuf, 0);
   if (isLabelOption(panelLabelBuf, "tu:nofacis.phem/r") != n)
     iconData[n - 021].x = n * 4;
 }
@@ -440,4 +440,19 @@ void savePanelChanges() {
     else
       saveCurrAccPanel(LittleFS);
   }
+}
+
+void showAccConvertValue() {
+  uint16_t value;
+  if (wifiSetting.protocol == CLIENT_RMX) {
+    value = isWindow(WIN_ACC_CTRL) ? atoi(accKeybAddr) : atoi(accKeybAdrEdit);
+    snprintf(autoConvBuf, ACC_LNG + 1, "%d.%d", ((value - 1) >> 3), ((value - 1) & 0x07) + 1);
+  }
+  else {
+    autoConvBuf[0] = '\0';
+  }
+  if (isWindow(WIN_ACC_CTRL))
+    newEvent(OBJ_TXT, TXT_CTRL_ADRCNV, EVNT_DRAW);
+  else
+    newEvent(OBJ_TXT, TXT_ACC_ADRCNV, EVNT_DRAW);
 }

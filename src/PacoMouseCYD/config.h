@@ -27,6 +27,7 @@
 #define CYD_HW_VERSION                CYD_TFT_28
 
 
+
 ////////////////////////////////////////////////////////////
 // ***** LED RGB PINS USE SELECTION *****
 ////////////////////////////////////////////////////////////
@@ -61,7 +62,7 @@
 
 // Max. locomotoras guardadas en stack - Max. locomotives saved in stack:
 
-#define LOCOS_IN_STACK                100
+#define LOCOS_IN_STACK                120
 
 
 ////////////////////////////////////////////////////////////

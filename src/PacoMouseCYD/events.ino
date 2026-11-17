@@ -16,7 +16,7 @@ void eventProcess() {
       DEBUG_MSG("Timer event");
       switch (event.objID) {
         case TMR_BLIGHT:
-          setCpuFrequencyMhz(80);                                           // set CPU frequency to 80MHz to save battery
+          //setCpuFrequencyMhz(80);                                           // set CPU frequency to 80MHz to save battery
           setBacklight(SYS_MIN_BL);                                         // set backlight to minimum
           break;
         case TMR_END_LOGO:
@@ -459,6 +459,10 @@ void eventProcess() {
                 saveLocoData(SD, myLocoData);
               else
                 saveLocoData(LittleFS, myLocoData);
+              if (changeFavLok) {
+                txtID = useID ? locoData[myLocoData].myLocoID : locoData[myLocoData].myAddr.address;
+                setFavLoco(txtID);
+              }
               closeWindow(WIN_LOK_EDIT);
               break;
             case BUT_NAME_CNCL:
@@ -533,7 +537,12 @@ void eventProcess() {
                     openWindow(WIN_PROG_CV);
                 }
                 else {
-                  openWindow(WIN_PROG_CV);
+                  if (wifiSetting.protocol == CLIENT_RMX) {
+                    if ((locoData[myLocoData].myProtocol == LOK_DCC) || (locoData[myLocoData].myProtocol == LOK_SX2))
+                      openWindow(WIN_PROG_CV);
+                  }
+                  else
+                    openWindow(WIN_PROG_CV);
                 }
               }
               break;
@@ -703,7 +712,7 @@ void eventProcess() {
               if (sdDetected) {
                 ftpSrv.begin();
                 runServerFTP = true;
-                sprintf(ftpCredentialsBuf, "User:  paco|Pass:  mouse|IP:      %d.%d.%d.%d||ftp://paco:mouse@%d.%d.%d.%d/",
+                sprintf(ftpCredentialsBuf, "User:  paco|Pass:  mouse|IP:      %d.%d.%d.%d    Port: 21||ftp://paco:mouse@%d.%d.%d.%d/",
                         myLocalIP[0], myLocalIP[1], myLocalIP[2], myLocalIP[3],
                         myLocalIP[0], myLocalIP[1], myLocalIP[2], myLocalIP[3]);
                 ftpCurrFileBuf[0] = '\0';
@@ -1267,18 +1276,10 @@ void eventProcess() {
               newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
               break;
             case ICON_NEXT_AUTO:
-              autoIndexStart += 5;
-              if (autoIndexStart >= AUTOMATION_MAX)
-                autoIndexStart = 0;
-              autoShowItems ();
-              newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+              autoNextPage();
               break;
             case ICON_PREV_AUTO:
-              if (autoIndexStart == 0)
-                autoIndexStart = AUTOMATION_MAX;
-              autoIndexStart -= 5;
-              autoShowItems ();
-              newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+              autoPrevPage();
               break;
           }
           break;
@@ -1415,6 +1416,17 @@ void eventProcess() {
                   startAutomation(txtID);
               }
               break;
+            case FNC_FAV_LOK:
+              txtID = useID ? locoData[myLocoData].myLocoID : locoData[myLocoData].myAddr.address;
+              if (txtID != getFavLoco()) {
+                if (wifiSetting.protocol == CLIENT_ECOS)                  // info screen for ECoS, so save it now
+                  setFavLoco(txtID);
+                else
+                  changeFavLok = true;                                    // save it later if OK
+                fncData[FNC_FAV_LOK].state = true;
+                newEvent(OBJ_FNC, FNC_FAV_LOK, EVNT_DRAW);
+              }
+              break;
           }
           break;
         case OBJ_TXT:
@@ -1448,7 +1460,7 @@ void eventProcess() {
               openWindow(WIN_SSID);
               break;
             case TXT_PORT:
-              if (wifiSetting.protocol != CLIENT_LNET)
+              if ((wifiSetting.protocol != CLIENT_LNET) && (wifiSetting.protocol != CLIENT_RMX))
                 break;
               txtID++;
             case TXT_IP4:
@@ -1490,13 +1502,15 @@ void eventProcess() {
               openWindow(WIN_VMAX);
               break;
             case TXT_EDIT_PROT:
-              scrProt++;
-              if (scrProt == LOK_SX1)
-                scrProt = LOK_DCC;
-              snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
-              buttonData[BUT_CS2_UID].backgnd = (scrProt == LOK_MFX) ? COLOR_CREAM : COLOR_DARKGREY;
-              newEvent(OBJ_TXT, TXT_EDIT_PROT, EVNT_DRAW);
-              newEvent(OBJ_BUTTON, BUT_CS2_UID, EVNT_DRAW);
+              if (wifiSetting.protocol == CLIENT_CS2) {
+                scrProt++;
+                if (scrProt == LOK_SX1)
+                  scrProt = LOK_DCC;
+                snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
+                buttonData[BUT_CS2_UID].backgnd = (scrProt == LOK_MFX) ? COLOR_CREAM : COLOR_DARKGREY;
+                newEvent(OBJ_TXT, TXT_EDIT_PROT, EVNT_DRAW);
+                newEvent(OBJ_BUTTON, BUT_CS2_UID, EVNT_DRAW);
+              }
               break;
             case TXT_SEL_ADDR6:
             case TXT_SEL_NAME6:
@@ -1809,13 +1823,17 @@ void eventProcess() {
                     showFieldsLNCV();
                     break;
                   case KEYB_CV_ADDR:
-                  case KEYB_ACC:
                     txtData[txtID].buf[0] = '\0';
                     break;
                   case KEYB_AUTO:
                     txtData[txtID].buf[0] = '\0';
                     showConvertValue(autoDef[encoderValue].opc, atoi(autoAddBuf)); // show converted value
                     newEvent(OBJ_TXT, TXT_AUTO_CONV, EVNT_DRAW);
+                    break;
+                  case KEYB_ACC_ADDR:
+                  case KEYB_ACC:
+                    txtData[txtID].buf[0] = '\0';
+                    showAccConvertValue ();
                     break;
                 }
               }
@@ -2070,6 +2088,10 @@ void eventProcess() {
                       showConvertValue(autoDef[encoderValue].opc, atoi(autoAddBuf)); // show converted value
                       newEvent(OBJ_TXT, TXT_AUTO_CONV, EVNT_DRAW);
                       break;
+                    case KEYB_ACC_ADDR:
+                    case KEYB_ACC:
+                      showAccConvertValue ();
+                      break;
                   }
                 }
               }
@@ -2152,20 +2174,17 @@ void eventProcess() {
         case OBJ_GAUGE:
           switch (event.objID) {
             case GAUGE_SPEED:
-              switch (encoderMax) {
-                case 15:
-                  value = 14;
-                  break;
-                case 31:
-                  value = 7;
-                  break;
-                case 50:
-                  value = 21;
-                  break;
-                default:
-                  value = 0;
-                  break;
-              }
+              value = 28;                               // 126, 127 steps
+              if (encoderMax < 80)
+                value = 0;                              // 128 steps
+              if (encoderMax < 55)
+                value = 21;                             // 1000 steps
+              if (encoderMax < 40)
+                value = 7;                              // 28, 31 steps
+              if (encoderMax < 30)
+                value = 35;                             // 28 steps
+              if (encoderMax < 20)
+                value = 14;                             // 14 steps
               if (lastClickX > gaugeData[GAUGE_SPEED].x) {
                 if (lastClickY > gaugeData[GAUGE_SPEED].y) {      // fourth quadrant
                   if (encoderValue < tapSpeedSteps[value + TAP_STP5])

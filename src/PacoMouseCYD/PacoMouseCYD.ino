@@ -37,12 +37,13 @@
        v0.12    16apr26   Added CS2 protocol. Gauge angle compensation in 28 steps. Added some function icons. Button actions for emergency stop & brake. Added Next train: Car cards & waybills game.
        v0.13    27jun26   Automation added. Get MFX loco UID. Lower ESP32 frequency when idle to save battery.
        v0.14    13aug26   Momentary functions. Added fast clock opcodes to automation. Added simple FTP server for SD remote access.Added Dutch language.
+       v0.15    11sep26   Change page in automation by action button. ECoS momentary functions. Added RMXnet protocol. Corrected minor bugs and ECoS icon conversion. Removed lowering ESP32 frequency when idle causes disconnection problems.Added new function icons.Favourite loco.
 */
 
 // PacoMouseCYD program version
 #define VER_H "0"
-#define VER_L "14"
-#define VER_R "c"
+#define VER_L "15"
+#define VER_R "e"
 
 
 //#define DEBUG                                               // Descomentar para mensajes de depuracion
@@ -204,7 +205,7 @@ struct {
   int  ok;
 } wifiSetting;
 
-enum typeProto {CLIENT_Z21, CLIENT_XNET, CLIENT_ECOS, CLIENT_CS2, CLIENT_LNET};
+enum typeProto {CLIENT_Z21, CLIENT_XNET, CLIENT_ECOS, CLIENT_CS2, CLIENT_RMX, CLIENT_LNET};
 
 WiFiClient Client;
 WiFiUDP Udp;
@@ -281,10 +282,12 @@ bool shuntingMode;
 byte shortAddress;
 uint8_t scrProt;
 
-const byte tapSpeedSteps[] = {0, 8, 20, 31, 43, 54, 63,     // 128 steps
-                              0, 6, 10, 15, 20, 26, 31,     // 28 steps
-                              0, 2,  4,  7, 10, 13, 15,     // 14 steps
-                              0, 7, 15, 25, 35, 43, 50,     // 1000 steps
+const byte tapSpeedSteps[] = {0,  8, 20, 31, 43,  54,  63,  // 128 steps
+                              0,  6, 10, 15, 20,  26,  31,  // 28, 31 steps
+                              0,  2,  4,  7, 10,  13,  14,  // 14 steps
+                              0,  7, 15, 25, 35,  43,  50,  // 1000 steps
+                              0, 16, 40, 62, 86, 108, 126,  // 126, 127 steps
+                              0,  5, 10, 15, 20,  24,  28,  // 28 steps
                              };
 
 enum tapSteps {TAP_STP0, TAP_STP1, TAP_STP2, TAP_STP3, TAP_STP4, TAP_STP5, TAP_STP6};
@@ -364,6 +367,7 @@ struct {
 enum locoProt {LOK_DCC, LOK_MM, LOK_MFX, LOK_SX1, LOK_SX2, LOK_PROT_MAX};
 const char locoNameProt[][4] = {"DCC", "MM", "MFX", "SX1", "SX2"};
 
+bool changeFavLok;
 
 ////////////////////////////////////////////////////////////
 // ***** ACCESSORIES *****
@@ -826,7 +830,7 @@ enum {
   T_REQ, T_VIEW, T_CONTROL, T_RELEASE, T_FORCE,
   T_GO, T_STOP, T_SHUTDWN, T_OK, T_MSG, T_SPEED, T_STEPS, T_DIR, T_FUNC, T_FSYMBOL, T_FSYMB, T_FICON,
   T_LOST, T_OTHER, T_CV, T_CVOK, T_ERROR, T_SWITCH,
-  T_CS1, T_ECOS, T_ECOS2, T_APPV,
+  T_CS1, T_ECOS, T_ECOS2, T_APPV, T_FDESC, T_FMOMENT,
 };
 
 // Token structure
@@ -854,36 +858,145 @@ enum {MSG_WAIT, MSG_START, MSG_REPLY, MSG_EVENT, MSG_END, MSG_REPLYBODY, MSG_EVE
 
 uint8_t mySpeedStep;
 
-const uint8_t FunktionsTastenSymbole[] = {                  // Conversion table from ECoS v4.2.9 to PacoMouseCYD function icons
-  1,  1,   2,  3,  4,  5,  6,  7,
-  8,  9,  10, 11, 12, 13, 14, 15,
-  16, 17, 18, 19, 20, 21, 22, 23,
-  2,  2,  24,  2,  2, 25, 26, 27,   //31
-
-  28, 29, 30, 2, 31,  2, 32,  2,
-  2,  2,  2,  2, 33, 34,  2,  2,   //47
-  2,  2,  2,  2,  2,  2,  2, 35,
-  2, 36,  2,  2,  2,  2,  2,  2,   //63
-
-  2,  2,  2,  2,  2,  2,  2,  2,
-  2,  2,  2,  2,  2,  2, 43, 44,   //79
-  2,  2,  2,  2, 37,  2,  2, 38,
-  39, 2,  2,  2,  2,  2,  2,  2,   //95
-
-  2,  2,  2,  2,  2, 39,  2,  2,   //103
-  2,  2,  2,  2,  2,  2,  2,  2,
-  2,  2,  2,  2,  2,  2,  2,  2,
-  2,  2,  2,  2, 40,  2,  2,  2,   //127
+const uint16_t FunktionsTastenSymboleECoS[128][2] = {                  // Conversion table from ECoS v4.2.9 to PacoMouseCYD function icons
+  //{funcdesc, PMCYD},               ECoS docs
+  {     0, 1},                  //   0 -
+  {     0, 1},                  //   1 -
+  {     6, 2},                  //   2 -
+  {     3, 3},                  //   3 - light
+  {   260, 4},                  //   4 - interior_lighting
+  {     4, 5},                  //   5 - light_0
+  {     7, 6},                  //   6 - sound
+  {     8, 7},                  //   7 - music
+  {     9, 8},                  //   8 - announce
+  {    10, 9},                  //   9 - routing_speed
+  {    11, 10},                 //  10 - abv
+  {    32, 11},                 //  11 - coupler
+  {    33, 12},                 //  12 - steam
+  {    34, 13},                 //  13 - panto
+  {    35, 14},                 //  14 - highbeam
+  {    36, 15},                 //  15 - bell
+  {    37, 16},                 //  16 - horn
+  {    38, 17},                 //  17 - whistle
+  {    39, 18},                 //  18 - door_sound
+  {    40, 19},                 //  19 - fan
+  {    42, 20},                 //  20 - shovel_work_sound
+  {    44, 21},                 //  21 - shift
+  {   261, 22},                 //  22 - plate_light
+  {   263, 23},                 //  23 - brakesound
+  {   299, 47},                 //  24 - crane_raise_lower
+  {   555, 48},                 //  25 - hook_up_down
+  {   773, 24},                 //  26 - wheel_light
+  {   811, 49},                 //  27 - turn
+  {  1032, 2},                  //  28 -
+  {  1023, 25},                 //  29 -
+  {  1287, 26},                 //  30 - coupler_sound
+  {  1543, 27},                 //  31 - track_sound
+  {  5639, 28},                 //  32 -
+  {  5640, 29},                 //  33 -
+  {  2055, 30},                 //  34 - thunderer_whistle
+  {  3847, 2},                  //  35 - buffer_sound
+  {     5, 31},                 //  36 - light_1
+  {     0, 2},                  //  37 -
+  { 11015, 32},                 //  38 -
+  {     7, 6},                  //  39 - sound
+  { 11271, 2},                  //  40 -
+  {     7, 6},                  //  41 - sound
+  {   554, 2},                  //  42 -
+  {     7, 6},                  //  43 - sound
+  {   809, 33},                 //  44 -
+  { 11527, 34},                 //  45 -
+  {     7, 6},                  //  46 - sound
+  {   553, 2},                  //  47 -
+  {  1321, 2},                  //  48 -
+  {     0, 2},                  //  49 -
+  { 32773, 2},                  //  50 -
+  {     5, 31},                 //  51 - light_1
+  {     0, 2},                  //  52 -
+  {     0, 2},                  //  53 -
+  {  1541, 2},                  //  54 -
+  {    42, 35},                 //  55 -
+  {     0, 2},                  //  56 -
+  { 11783, 36},                 //  57 -
+  {  1799, 2},                  //  58 -
+  { 12039, 2},                  //  59 -
+  {  1029, 46},                 //  60 -
+  {   772, 2},                  //  61 -
+  {  1065, 2},                  //  62 -
+  {  6151, 2},                  //  63 -
+  {     0, 2},                  //  64 -
+  {     7, 6},                  //  65 -
+  {  4134, 2},                  //  66 -
+  {     0, 2},                  //  67 -
+  {  6407, 2},                  //  68 -
+  {  3591, 2},                  //  69 -
+  {     0, 2},                  //  70 -
+  {     0, 2},                  //  71 -
+  {     0, 2},                  //  72 -
+  {     0, 2},                  //  73 -
+  {  7431, 2},                  //  74 -
+  {     0, 2},                  //  75 -
+  {     2, 2},                  //  76 - function
+  {     2, 2},                  //  77 - function
+  { 16387, 2},                  //  78 -
+  { 32771, 2},                  //  79 -
+  { 16419, 2},                  //  80 -
+  { 32803, 2},                  //  81 -
+  {     0, 2},                  //  82 -
+  {     0, 2},                  //  83 -
+  {  1796, 37},                 //  84 -
+  {     0, 2},                  //  85 -
+  {  1797, 2},                  //  86 -
+  {   260, 38},                 //  87 - interior_lighting
+  {   260, 38},                 //  88 - interior_lighting
+  { 16418, 2},                  //  89 -
+  { 32802, 2},                  //  90 -
+  {     0, 2},                  //  91 -
+  {     0, 2},                  //  92 -
+  { 16416, 2},                  //  93 -
+  { 32800, 2},                  //  94 -
+  {  2347, 2},                  //  95 -
+  {  2603, 2},                  //  96 -
+  {  1835, 2},                  //  97 -
+  {  2091, 2},                  //  98 -
+  {  1067, 2},                  //  99 -
+  {     0, 2},                  // 100 -
+  {   300, 39},                 // 101 -
+  {     0, 2},                  // 102 -
+  {     0, 2},                  // 103 -
+  {     0, 2},                  // 104 -
+  {     0, 2},                  // 105 -
+  {    37, 2},                  // 106 -
+  {  4359, 2},                  // 107 -
+  {     0, 2},                  // 108 -
+  {     0, 2},                  // 109 -
+  {     0, 2},                  // 110 -
+  {     0, 2},                  // 111 -
+  {     0, 2},                  // 112 -
+  {     0, 2},                  // 113 -
+  {  1579, 50},                 // 114 -
+  {     0, 2},                  // 115 -
+  {     0, 2},                  // 116 -
+  {     0, 2},                  // 117 -
+  {     0, 2},                  // 118 -
+  {     0, 2},                  // 119 -
+  {     0, 2},                  // 120 -
+  {     0, 2},                  // 121 -
+  {     0, 2},                  // 122 -
+  {     0, 2},                  // 123 -
+  {   559, 40},                 // 124 -
+  {     0, 2},                  // 125 -
+  {     0, 2},                  // 126 -
+  {     0, 2},                  // 127 -
 };
-
 
 const uint8_t FunktionsTastenSymboleCS1[] = {               // Conversion table from CS1 v2.0.4 to PacoMouseCYD function icons
   2, 10,  3, 14,  5, 31, 15, 16,
-  11, 13, 17,  9, 12,  6,  7, 23,
+  11, 13, 17,  9, 12,  6,  7, 23,  //15
   4,  2, 25, 26, 22,  2, 30, 27,
-  2,  2,  2, 28, 29, 20, 21,  8,   //31
+  2,  2,  2, 28, 29, 20, 21,  8,  //31
 
-  18, 2,  2,  2,  2,  2,  2,  2,
+  18,  2,  2,  2,  2,  2,  2,  2,
   2,  2,  2,  2,  2,  2,  2,  2,  //47
   2,  2,  2,  2,  2,  2,  2,  2,
   2,  2,  2,  2,  2,  2,  2,  2,  //63
@@ -963,6 +1076,32 @@ bool uidFound;
 bool isMFX;
 
 #define CS2_PING_INTERVAL 20000UL
+
+
+////////////////////////////////////////////////////////////
+// ***** RMX *****
+////////////////////////////////////////////////////////////
+
+#define RMX_PKT       0x7C                                  // Packet start
+#define RMX_OK        0x00
+#define RMX_ERR       0x01
+#define RMX_MODE      0x03
+#define RMX_STATUS    0x04
+#define RMX_WRITESX   0x05
+#define RMX_READSX    0x06
+#define RMX_LOCO_INFO 0x08
+#define RMX_CHANNEL   0x20
+#define RMX_LOCO_SPD  0x24
+#define RMX_LOCO_FNC  0x28
+#define RMX_PROG      0xC0
+
+enum rmxData {RMX_HEADER, RMX_LNG, RMX_CMD, RMX_DATA0, RMX_DATA1, RMX_DATA2, RMX_DATA3, RMX_DATA4, RMX_DATA5, RMX_DATA6, RMX_DATA7};
+
+uint8_t rmxBuf[33];
+uint8_t rmxOutBuf[33];
+uint8_t rmxPos = RMX_HEADER;
+uint8_t recordsRMX;
+
 
 ////////////////////////////////////////////////////////////
 // ***** MAIN PROGRAM *****
@@ -1098,10 +1237,10 @@ void initVariables() {
   radioData[RAD_NETWORKS].value = pos;
   value = EE_WIFI + (pos * sizeof(wifiSetting));
   EEPROM.get (value, wifiSetting);
-  xm = (EEPROM.read(EE_XMIN_H) << 8) + EEPROM.read(EE_XMIN_L);
-  xM = (EEPROM.read(EE_XMAX_H) << 8) + EEPROM.read(EE_XMAX_L);
-  ym = (EEPROM.read(EE_YMIN_H) << 8) + EEPROM.read(EE_YMIN_L);
-  yM = (EEPROM.read(EE_YMAX_H) << 8) + EEPROM.read(EE_YMAX_L);
+  xm = ((EEPROM.read(EE_XMIN_H) << 8) + EEPROM.read(EE_XMIN_L)) & 0x0FFF;
+  xM = ((EEPROM.read(EE_XMAX_H) << 8) + EEPROM.read(EE_XMAX_L)) & 0x0FFF;
+  ym = ((EEPROM.read(EE_YMIN_H) << 8) + EEPROM.read(EE_YMIN_L)) & 0x0FFF;
+  yM = ((EEPROM.read(EE_YMAX_H) << 8) + EEPROM.read(EE_YMAX_L)) & 0x0FFF;
   touchscreen.setCalibration(xm, xM, ym, yM);               // set calibration values
   DEBUG_MSG("xMin: %d, xMax: %d, yMin: %d, yMax: %d", xm, xM, ym, yM);
   backlight = EEPROM.read(EE_BACKLIGHT);                    // LEDs

@@ -86,10 +86,23 @@ void clearLocoData (uint16_t pos) {
   locoData[pos].myProtocol = LOK_DCC;
 }
 
+uint16_t getFavLoco() {
+  return (EEPROM.read(EE_ADRH) << 8) + EEPROM.read(EE_ADRL);
+}
+
+void setFavLoco(uint16_t loco) {
+  EEPROM.write(EE_ADRH, loco >> 8);
+  EEPROM.write(EE_ADRL, loco & 0xFF);
+  EEPROM.commit();
+  changeFavLok = false;
+  DEBUG_MSG("Favourite loco: %d",loco)
+}
 
 void getLastLoco() {
   uint16_t loco;
-  loco = locoStack[0];                                      // get most recent loco in stack (filesystem)
+  loco = getFavLoco();                                      // get favourite loco
+  if ((loco == 0) || (loco > 9999))
+    loco = locoStack[0];                                    // get most recent loco in stack (filesystem)
   loco = checkLocoAddress(loco);                            // avoid empty stack
   findLocoData(loco);                                       // get pos in stack also check stack full
   loadThrottleData();                                       // load data to throttle
@@ -296,6 +309,10 @@ void updateSpeedHID() {
       encoderMax = 50;                                      // 0..100 -> 0..50
       encoderValue = (locoData[myLocoData].mySpeed > 1) ? locoData[myLocoData].mySpeed >> 1 : 0;
       break;
+    case CLIENT_RMX:
+      encoderMax = getMaxStepRMX();
+      encoderValue = locoData[myLocoData].mySpeed;
+      break;
   }
   updateSpeedDir();
 }
@@ -390,6 +407,11 @@ void updateMySpeed() {
       if ((encoderValue == 0) && shuntingMode)              // Modo maniobras
         encoderValue = 1;
       locoData[myLocoData].mySpeed = encoderValue << 1;        // 0..50
+      break;
+    case CLIENT_RMX:
+      if ((encoderValue == 0) && shuntingMode)              // Modo maniobras
+        encoderValue = 1;
+      locoData[myLocoData].mySpeed = encoderValue;
       break;
   }
   locoOperationSpeed();

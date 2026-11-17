@@ -345,6 +345,14 @@ void showConvertValue (char opc, uint16_t value) {
     case 'M':                                                                     // fast clock minute --:MM
       snprintf(autoConvBuf, ACC_LNG + 1, "--:%02d", value);
       break;
+    case 't':                                                                     // turnouts
+    case 'T':
+      switch (wifiSetting.protocol) {
+        case CLIENT_RMX:
+          snprintf(autoConvBuf, ACC_LNG + 1, "%d.%d", ((value - 1) >> 3), ((value - 1) & 0x07) + 1);
+          break;
+      }
+      break;
     case 'Z':                                                                     // feedback
     case 'z':
       switch (wifiSetting.protocol) {
@@ -366,6 +374,9 @@ void showConvertValue (char opc, uint16_t value) {
           mod = ((value - 1) / 16) + 1;
           cnt = (value & 0x000F) ? value % 16 : 16;
           snprintf(autoConvBuf, ACC_LNG + 1, "%d.%d.%d", bus, mod, cnt);
+          break;
+        case CLIENT_RMX:
+          snprintf(autoConvBuf, ACC_LNG + 1, "%d.%d", ((value - 1) >> 3), ((value - 1) & 0x07) + 1);
           break;
       }
       break;
@@ -443,6 +454,25 @@ void autoMakeRoom (uint16_t opcPos, uint16_t lng) {
     autoEditOpcodes[MAX_LABEL_LNG - n] = autoEditOpcodes[MAX_LABEL_LNG - n - lng];
   }
 }
+
+
+void autoNextPage() {
+  autoIndexStart += 5;
+  if (autoIndexStart >= AUTOMATION_MAX)
+    autoIndexStart = 0;
+  autoShowItems ();
+  newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+}
+
+
+void autoPrevPage() {
+  if (autoIndexStart == 0)
+    autoIndexStart = AUTOMATION_MAX;
+  autoIndexStart -= 5;
+  autoShowItems ();
+  newEvent(OBJ_WIN, WIN_AUTOMATION, EVNT_DRAW);
+}
+
 
 ////////////////////////////////////////////////////////////
 // ***** AUTOMATION *****
@@ -591,7 +621,7 @@ void automationProcess() {
     switch (automation[currAutomation].opcode) {
       case 'L':                                                                   // loco address
         if (param > 0) {
-          getNewLoco(param);                                                      // Z21,XNET,LNET: Loco addr, ECOS: Loco ID, CS2: Loco addr (if MFX be sure UID is set correctly)
+          getNewLoco(param);                                                      // Z21,XNET,LNET,RMX: Loco addr, ECOS: Loco ID, CS2: Loco addr (if MFX be sure UID is set correctly)
           automation[currAutomation].value = AUTO_LOCO_CHG;
           if (isWindow(WIN_THROTTLE))
             newEvent(OBJ_WIN, WIN_THROTTLE, EVNT_DRAW);
@@ -695,6 +725,9 @@ void autoSetSpeed (uint16_t percent) {
       break;
     case CLIENT_CS2:
       locoData[myLocoData].mySpeed = percent;                                   // 0..100
+      break;
+    case CLIENT_RMX:
+      locoData[myLocoData].mySpeed = percent * getMaxStepRMX() / 100;           // 0..14, 0..28, 0..31, 0..126, 0..127
       break;
   }
   locoOperationSpeed();

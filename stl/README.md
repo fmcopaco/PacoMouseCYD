@@ -1,10 +1,15 @@
 # PacoMouseCYD 3D files
 
-STL files for PacoMouseCYD
+3D files for PacoMouseCYD
+
+Jeroen van der lee
+
+* TPS63020 buck/boost with 1 battery and charger
+* TPS63020 buck/boost with 2 batteries
 
 
 
-## Other PacoMouse STL files
+## Other PacoMouse 3D files
 
 Isaac Guadix - https://www.iguadix.es/content/carcasa-pacomousecyd
 

@@ -126,6 +126,9 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
   { // LBL_SEL_CS2
     [LANG_ENGLISH] = "CS2",
   },
+  { // LBL_SEL_RMX
+    [LANG_ENGLISH] = "RMXnet",
+  },
   { // LBL_SEL_LNET
     [LANG_ENGLISH] = "Loconet over TCP/IP",
   },
@@ -223,7 +226,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_ENGLISH] = "Reset to apply\nchanges",
     [LANG_SPANISH] = "Reinicie para\naplicar los\ncambios",
     [LANG_CATALAN] = "Reiniciar per \naplicar els\ncanvis",
-    [LANG_GERMAN]  = "Neustart, um die\nAnderungen zu\nübernehmen",
+    [LANG_GERMAN]  = "Neustart, um die\nAnderungen zu\nubernehmen",
     [LANG_CZECH]   = "Restartujte pro\npouziti zmen",
     [LANG_FRENCH]  = "Reset pour\nappliquer les\nchangements",
     [LANG_DUTCH]   = "Reset om de\nwijzigingen\ntoe te passen",
@@ -931,7 +934,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_ENGLISH] = "Automation",
     [LANG_SPANISH] = "Automatizacion",
     [LANG_CATALAN] = "Automatitzar",
-    [LANG_GERMAN]  = "Automatisier",
+    [LANG_GERMAN]  = "Automatisierung",
     [LANG_CZECH]   = "Automatika",
     [LANG_FRENCH]  = "Automatisation",
     [LANG_DUTCH]   = "Automatisch",
@@ -940,7 +943,7 @@ static const char *translations[][MAX_LANG] = {             // DON'T CHANGE ORDE
     [LANG_ENGLISH] = "Automation",
     [LANG_SPANISH] = "Automatizacion",
     [LANG_CATALAN] = "Automatitzar",
-    [LANG_GERMAN]  = "Automatisier",
+    [LANG_GERMAN]  = "Automatisierung",
     [LANG_CZECH]   = "Automatika",
     [LANG_FRENCH]  = "Automatisation",
     [LANG_DUTCH]   = "Automatisch",

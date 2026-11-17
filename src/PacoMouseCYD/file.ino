@@ -91,7 +91,7 @@ void deleteLocoData (fs::FS &fs, uint16_t num) {
 
 bool readLocoData(fs::FS &fs, uint16_t num, uint16_t pos) {            // read loco data from .csv file
   char line[200];
-  bool dataOK;
+  bool dataOK, fieldOK;
   uint16_t n;
   File myFile;
   dataOK = false;
@@ -99,7 +99,11 @@ bool readLocoData(fs::FS &fs, uint16_t num, uint16_t pos) {            // read l
   myFile = fs.open(line);
   if (myFile) {
     if (readCSV(myFile, line, sizeof(line), false)) {                                     // skip header line
-      if (readCSV(myFile, locoData[pos].myName, sizeof(locoData[pos].myName), true)) {    // read data field: Name
+      if (wifiSetting.protocol == CLIENT_RMX)
+        fieldOK = readCSV(myFile, line, sizeof(locoData[pos].myName), true);
+      else
+        fieldOK = readCSV(myFile, locoData[pos].myName, sizeof(locoData[pos].myName), true);
+      if (fieldOK) {                                                                      // readed data field: Name
         if (readCSV(myFile, line, sizeof(line), true)) {                                  // read data field: Picture
           locoData[pos].myLocoID = atoi(line);
           if (readCSV(myFile, line, sizeof(line), true)) {
@@ -113,7 +117,10 @@ bool readLocoData(fs::FS &fs, uint16_t num, uint16_t pos) {            // read l
               locoData[pos].myFuncIcon[n] = (uint8_t)(atoi(line) << 1);
               //DEBUG_MSG("Func: %d - %d", n, locoData[pos].myFuncIcon[n])
             }
-            locoData[pos].myProtocol = readCSV(myFile, line, sizeof(line), true) ? atoi(line) : LOK_DCC;
+            if (wifiSetting.protocol == CLIENT_RMX)
+              readCSV(myFile, line, sizeof(line), true);
+            else
+              locoData[pos].myProtocol = readCSV(myFile, line, sizeof(line), true) ? atoi(line) : LOK_DCC;
             locoData[pos].myMomentFunc = readCSV(myFile, line, sizeof(line), true) ? atoi(line) : 0;
             locoData[pos].myAddr.address = num;
             dataOK = true;
@@ -169,7 +176,7 @@ void loadLocoFiles(fs::FS &fs, const char * dirname) {
   uint16_t pos, adr;
   char nameFile[50];
   File myFile;
-  if (wifiSetting.protocol == CLIENT_ECOS)
+  if ((wifiSetting.protocol == CLIENT_ECOS) || (wifiSetting.protocol == CLIENT_RMX))
     return;
   File root = fs.open(dirname);
   if (!root) {

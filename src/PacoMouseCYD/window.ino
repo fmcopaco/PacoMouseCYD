@@ -118,6 +118,7 @@ void openWindow(uint16_t id) {
       createObject(OBJ_LABEL, LBL_SEL_XNET);
       createObject(OBJ_LABEL, LBL_SEL_ECOS);
       createObject(OBJ_LABEL, LBL_SEL_CS2);
+      createObject(OBJ_LABEL, LBL_SEL_RMX);
       createObject(OBJ_LABEL, LBL_SEL_LNET);
       createObject(OBJ_LABEL, LBL_SEL_LBSERVER);
       createObject(OBJ_LABEL, LBL_SEL_BINARY);
@@ -279,11 +280,19 @@ void openWindow(uint16_t id) {
         snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
         buttonData[BUT_CS2_UID].backgnd = (scrProt == LOK_MFX) ? COLOR_CREAM : COLOR_DARKGREY;
       }
-      else
-        sprintf (locoEditProt, "DCC");
+      else {
+        if (wifiSetting.protocol == CLIENT_RMX) {
+          snprintf(locoEditProt, NAME_LNG + 1, "%s", locoNameProt[scrProt]);
+        }
+        else
+          sprintf (locoEditProt, "DCC");
+      }
       for (n = 0; n < 29; n++)
         fncData[FNC_F0 + n].idIcon = locoData[myLocoData].myFuncIcon[n];
       fncMomentEdit = locoData[myLocoData].myMomentFunc;
+      n = useID ? locoData[myLocoData].myLocoID : locoData[myLocoData].myAddr.address;
+      fncData[FNC_FAV_LOK].state = (n == getFavLoco());
+      changeFavLok = false;
       createObject(OBJ_WIN, WIN_LOK_EDIT);
       createObject(OBJ_LABEL, LBL_ADDR);
       createObject(OBJ_LABEL, LBL_IMAGE);
@@ -295,9 +304,13 @@ void openWindow(uint16_t id) {
         createObject(OBJ_TXT, TXT_EDIT_PROT);
         createObject(OBJ_BUTTON, BUT_CS2_UID);
       }
+      if (wifiSetting.protocol == CLIENT_RMX) {
+        createObject(OBJ_TXT, TXT_EDIT_PROT);
+      }
       createObject(OBJ_TXT, TXT_EDIT_NAME);
       createObject(OBJ_TXT, TXT_EDIT_IMAGE);
       createObject(OBJ_TXT, TXT_EDIT_VMAX);
+      createObject(OBJ_FNC, FNC_FAV_LOK);
       createObject(OBJ_BUTTON, BUT_EDIT_FUNC);
       createObject(OBJ_BUTTON, BUT_EDIT_CNCL);
       if (wifiSetting.protocol != CLIENT_ECOS) {
@@ -521,7 +534,12 @@ void openWindow(uint16_t id) {
           modeProg = true;
       }
       else {
-        createObject(OBJ_BUTTON, BUT_CV_READ);
+        if (wifiSetting.protocol == CLIENT_RMX) {
+          if (locoData[myLocoData].myProtocol == LOK_DCC)
+            createObject(OBJ_BUTTON, BUT_CV_READ);
+        }
+        else
+          createObject(OBJ_BUTTON, BUT_CV_READ);
       }
       switchData[SW_POM].state = modeProg;
       createObject(OBJ_SWITCH, SW_POM);
@@ -609,7 +627,8 @@ void openWindow(uint16_t id) {
     case WIN_ACCESSORY:
       editAccessory = false;
       winData[WIN_ACCESSORY].backgnd = COLOR_WHITE;
-      updateAccPanel();
+      //updateAccPanel();
+      populateAccPanel();
       createObject(OBJ_WIN, WIN_ACCESSORY);
       createObject(OBJ_BUTTON, BUT_ACC_0);
       createObject(OBJ_BUTTON, BUT_ACC_1);
@@ -687,6 +706,7 @@ void openWindow(uint16_t id) {
       createObject(OBJ_BUTTON, BUT_ACC_RED);
       createObject(OBJ_BUTTON, BUT_ACC_GREEN);
       newEvent(OBJ_WIN, WIN_ACC_CTRL, EVNT_DRAW);
+      showAccConvertValue();
       break;
     case WIN_ACC_ASPECT:
       createObject(OBJ_WIN, WIN_ACC_ASPECT);
@@ -761,15 +781,19 @@ void openWindow(uint16_t id) {
       snprintf(accKeybAdrEdit, ADDR_LNG + 1, "%d",  currAccEdit.addr);
       createObject(OBJ_WIN, WIN_ACC_ADDR1);
       createObject(OBJ_TXT, TXT_ACC_EDIT);
+      createObject(OBJ_TXT, TXT_ACC_ADRCNV);
       createObject(OBJ_KEYBOARD, KEYB_ACC_ADDR);
       newEvent(OBJ_WIN, WIN_ACC_ADDR1, EVNT_DRAW);
+      showAccConvertValue();
       break;
     case WIN_ACC_ADDR2:
       snprintf(accKeybAdrEdit, ADDR_LNG + 1, "%d",  currAccEdit.addr2);
       createObject(OBJ_WIN, WIN_ACC_ADDR2);
       createObject(OBJ_TXT, TXT_ACC_EDIT);
+      createObject(OBJ_TXT, TXT_ACC_ADRCNV);
       createObject(OBJ_KEYBOARD, KEYB_ACC_ADDR);
       newEvent(OBJ_WIN, WIN_ACC_ADDR2, EVNT_DRAW);
+      showAccConvertValue();
       break;
     case WIN_WIFI_SCAN:
       setTimer(TMR_SCAN, 5, TMR_ONESHOT);

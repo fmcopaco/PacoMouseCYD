@@ -65,7 +65,8 @@ void infoLocomotoraECoS (unsigned int ID) {
       snprintf(cmd, 64, "get(%d, func[%d])\n", ID, n);                    // Functions
       sendMsgECOS(cmd);
       if (appVer > 2)
-        snprintf(cmd, 64, "get(%d, funcicon[%d])\n", ID, n);            // Icon functions
+        //snprintf(cmd, 64, "get(%d, funcicon[%d])\n", ID, n);              // Icon functions
+        snprintf(cmd, 64, "get(%d, funcdesc[%d])\n", ID, n);                // Icon & Momentary function
       else
         snprintf(cmd, 64, "get(%d, funcsymbol[%d])\n", ID, n);            // Icon functions
       sendMsgECOS(cmd);
@@ -131,12 +132,16 @@ void setAccessoryECoS(unsigned int FAdr, int pair, bool activate)  {
 void resumeOperationsECoS () {
   snprintf(cmd, 64, "set(%d, go)\n", ID_ECOS);                            // Track on
   sendMsgECOS(cmd);
+  csStatus = 1;
+  showTrkECoS();
 }
 
 
 void emergencyOffECoS() {
   snprintf(cmd, 64, "set(%d, stop)\n", ID_ECOS);                          // Track off
   sendMsgECOS(cmd);
+  csStatus = 0;
+  showTrkECoS();
 }
 
 void showTrkECoS() {
@@ -436,6 +441,8 @@ int keyword(char *s) {
         return (T_FSYMB);
       if (!strcmp(s, "funcicon"))
         return (T_FICON);
+      if (!strcmp(s, "funcdesc"))
+        return (T_FDESC);
       if (!strcmp(s, "func"))
         return (T_FUNC);
       if (!strcmp(s, "force"))
@@ -448,6 +455,8 @@ int keyword(char *s) {
     case 'm':
       if (!strcmp(s, "msg"))
         return (T_MSG);
+      if (!strcmp(s, "moment"))
+        return (T_FMOMENT);
       break;
     case 'n':
       if (!strcmp(s, "name"))
@@ -971,11 +980,42 @@ void decodeReplyLoco() {
         scan(&T);
         scan(&T);
         if (T.token == T_INTLIT) {
-          locoData[myLocoData].myFuncIcon[numFunc] = FunktionsTastenSymbole[T.intvalue & 0x7F] << 1;
+          locoData[myLocoData].myFuncIcon[numFunc] = getFunktionsTastenSymbole(T.intvalue) << 1;
           DEBUG_MSG("Func: %d, Icon: %d", numFunc, T.intvalue)
+        }
+      }
+      break;
+    case T_FDESC:                                                       // 1000 funcdesc[0,38]     1000 funcdesc[0,38,moment]
+      scan(&T);
+      scan(&T);
+      if (T.token == T_INTLIT) {
+        numFunc = T.intvalue;
+        scan(&T);
+        scan(&T);
+        if (T.token == T_INTLIT) {
+          if (appVer > 2)
+            locoData[myLocoData].myFuncIcon[numFunc] = getFunktionsTastenSymbole(T.intvalue) << 1;
+          else
+            locoData[myLocoData].myFuncIcon[numFunc] = FunktionsTastenSymboleCS1[T.intvalue & 0x3F] << 1;
+          scan(&T);
+          bitClear(locoData[myLocoData].myMomentFunc, numFunc);
+          if (T.token == T_COMMA) {
+            scan(&T);
+            if (T.token == T_FMOMENT)
+              bitSet(locoData[myLocoData].myMomentFunc, numFunc);
+          }
         }
       }
       break;
   }
   discardLine();
+}
+
+uint8_t getFunktionsTastenSymbole(uint16_t value) {
+  uint8_t n;
+  for (n = 0; n < 128; n++) {
+    if (FunktionsTastenSymboleECoS[n][0] == value)
+      return ((uint8_t)FunktionsTastenSymboleECoS[n][1]);
+  }
+  return 2;
 }

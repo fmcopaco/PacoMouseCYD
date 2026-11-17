@@ -49,7 +49,7 @@ void setRotationDisplay(uint8_t pos) {                            // Rotate disp
 void aliveAndKicking() {
   setTimer (TMR_BLIGHT, INACT_TIME, TMR_ONESHOT);                 // reset timeout and restore backlight
   if (currBacklight != backlight) {
-    setCpuFrequencyMhz(240);                                      // restore CPU frequency to 240MHz
+    //setCpuFrequencyMhz(240);                                      // restore CPU frequency to 240MHz
     setBacklight(backlight);
   }
 }
@@ -276,6 +276,18 @@ initResult initSequence() {                                       // Performs in
         pingCS2();
         getStatusCS2();
         break;
+      case CLIENT_RMX:
+        if (!Client.connect(wifiSetting.CS_IP, wifiSetting.port)) {
+          DEBUG_MSG("Connection to RMXnet failed");
+          result = INIT_NO_CONNECT;
+        }
+        else {
+          Client.setNoDelay(true);
+          startRMX();
+          waitWifiData(1000);
+          //getStatusRMX();                                           // get power status
+        }
+        break;
     }
   }
   else {
@@ -324,6 +336,7 @@ void updateLockAcc() {
 void startCalibration() {
   if (! calibrationPending) {
     calibrationPending = true;
+    touchscreen.setCalibration(0, 4095, 0, 4095);                 // set default calibration values
     newEvent(OBJ_WIN, WIN_CALIBRATE, EVNT_WOPEN);
   }
 }
@@ -336,6 +349,7 @@ void calibrateTouchscreen(uint16_t colorIn, uint16_t colorOut, uint16_t bg) {
   TS_BOT = 0;
   TS_LEFT = 4095;
   TS_RT = 0;
+  touchscreen.setCalibration(TS_LEFT, TS_RT, TS_TOP, TS_BOT);
   tft.fillScreen(bg);
   for (int i = 0; i < 4; i++) {
     tft.fillCircle(0, 0, 15, bg);                                 // delete touch corners points
@@ -519,6 +533,9 @@ void wifiProcess() {
       case CLIENT_CS2:
         processCS2();
         break;
+      case CLIENT_RMX:
+        processRMX();
+        break;
     }
   }
 }
@@ -560,6 +577,10 @@ void setProtocolData() {
       snprintf(keybProtoBuf, PWD_LNG, "CS2");
       snprintf(keybPortBuf, 6, "%d", CS2Port);
       break;
+    case CLIENT_RMX:
+      snprintf(keybProtoBuf, PWD_LNG, "RMXnet");
+      snprintf(keybPortBuf, 6, "%d", wifiSetting.port);
+      break;
   }
   for (n = 0; n < 5; n++)
     txtData[TXT_IP1 + n].backgnd = COLOR_BACKGROUND;
@@ -584,6 +605,8 @@ void setOptionsData() {
     case CLIENT_ECOS:
       break;
     case CLIENT_CS2:
+      break;
+    case CLIENT_RMX:
       break;
   }
 }
@@ -611,6 +634,9 @@ void infoLocomotora (unsigned int loco) {
     case CLIENT_CS2:
       infoLocomotoraCS2 (loco);
       break;
+    case CLIENT_RMX:
+      infoLocomotoraRMX (loco);
+      break;
   }
 }
 
@@ -632,6 +658,9 @@ void locoOperationSpeed() {
     case CLIENT_CS2:
       locoOperationSpeedCS2();
       break;
+    case CLIENT_RMX:
+      locoOperationSpeedRMX();
+      break;
   }
 }
 
@@ -652,6 +681,9 @@ void changeDirection() {
     case CLIENT_CS2:
       changeDirectionCS2();
       break;
+    case CLIENT_RMX:
+      locoOperationSpeedRMX();
+      break;
   }
 }
 
@@ -671,6 +703,9 @@ void funcOperations (uint8_t fnc) {
       break;
     case CLIENT_CS2:
       funcOperationsCS2(fnc);
+      break;
+    case CLIENT_RMX:
+      funcOperationsRMX(fnc);
       break;
   }
 }
@@ -693,6 +728,9 @@ byte getCurrentStep() {
     case CLIENT_CS2:
       value = getCurrentStepCS2();
       break;
+    case CLIENT_RMX:
+      value = getCurrentStepRMX();
+      break;
   }
   return value;
 }
@@ -710,13 +748,14 @@ void releaseLoco() {
       // XNET not defined
       // Z21  not defined
       // CS2  not defined
+      // RMX  not defined
   }
 }
 
 
 void sendAccessory(unsigned int FAdr, int pair, bool activate) {
   if (activate)
-    (pair > 0) ? bitSet(accPosition[FAdr >> 3], FAdr & 0x0007) : bitClear(accPosition[FAdr >> 3], FAdr & 0x0007);
+    (pair > 0) ? bitSet(accPosition[(FAdr & 0x07FF) >> 3], FAdr & 0x0007) : bitClear(accPosition[(FAdr & 0x07FF) >> 3], FAdr & 0x0007);
   switch (wifiSetting.protocol) {
     case CLIENT_Z21:
       setAccessoryZ21(FAdr, pair, activate);
@@ -732,6 +771,9 @@ void sendAccessory(unsigned int FAdr, int pair, bool activate) {
       break;
     case CLIENT_CS2:
       setAccessoryCS2(FAdr, pair, activate);
+      break;
+    case CLIENT_RMX:
+      setAccessoryRMX(FAdr, pair, activate);
       break;
   }
 }
@@ -763,6 +805,9 @@ void resumeOperations() {
     case CLIENT_CS2:
       resumeOperationsCS2();
       break;
+    case CLIENT_RMX:
+      resumeOperationsRMX();
+      break;
   }
 }
 
@@ -784,6 +829,9 @@ void emergencyOff() {
       break;
     case CLIENT_CS2:
       emergencyOffCS2();
+      break;
+    case CLIENT_RMX:
+      emergencyOffRMX();
       break;
   }
 }
@@ -815,6 +863,9 @@ bool isTrackOff() {
     case CLIENT_CS2:
       state = (csStatus > 0) ? false : true;
       break;
+    case CLIENT_RMX:
+      state = (csStatus > 0) ? false : true;
+      break;
   }
   return state;
 }
@@ -833,6 +884,9 @@ void emergencyStop() {
       break;
     case CLIENT_CS2:
       emergencyStopCS2();
+      break;
+    case CLIENT_RMX:
+      emergencyStopRMX();
       break;
       // ECoS not supported
   }
@@ -856,6 +910,9 @@ void getStatusCS() {
     case CLIENT_CS2:
       getStatusCS2();                                             // undocumented
       break;
+    case CLIENT_RMX:
+      getStatusRMX();
+      break;
   }
 }
 
@@ -874,6 +931,7 @@ void setTime(byte hh, byte mm, byte rate) {
       setTimeCS2(hh, mm, rate);
       break;
       // ECoS not supported
+      // RMX  not supported
   }
 }
 
@@ -895,6 +953,9 @@ void readCV (unsigned int adr, byte stepPrg) {
       break;
     case CLIENT_CS2:
       readCVCS2(adr, stepPrg);
+      break;
+    case CLIENT_RMX:
+      readCVRMX(adr, stepPrg);
       break;
   }
 }
@@ -918,6 +979,9 @@ void writeCV (unsigned int adr, unsigned int data, byte stepPrg) {
     case CLIENT_CS2:
       writeCVCS2(adr, data, stepPrg);
       break;
+    case CLIENT_RMX:
+      writeCVRMX(adr, data, stepPrg);
+      break;
   }
 }
 
@@ -937,6 +1001,7 @@ void exitProgramming() {
       break;
       // LNET not defined
       // CS2  not defined
+      // RMX not defined
   }
 }
 
@@ -954,6 +1019,9 @@ void queryFeedback(uint16_t fbk) {
       break;
     case CLIENT_CS2:
       queryFeedbackCS2(fbk);
+      break;
+    case CLIENT_RMX:
+      queryFeedbackRMX(fbk);
       break;
       // LNET not defined
   }

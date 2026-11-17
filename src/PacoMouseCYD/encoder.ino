@@ -354,6 +354,9 @@ void doAction(uint8_t actionSW) {
         backlight = value;
         newEvent(OBJ_BAR, BAR_BLIGHT, EVNT_DRAW);
       }
+      if (isWindow(WIN_AUTOMATION)) {
+        autoNextPage();
+      }
       break;
     case ACT_PREV:
       if (isWindow(WIN_THROTTLE))
@@ -385,6 +388,9 @@ void doAction(uint8_t actionSW) {
         setBacklight (value);
         backlight = value;
         newEvent(OBJ_BAR, BAR_BLIGHT, EVNT_DRAW);
+      }
+      if (isWindow(WIN_AUTOMATION)) {
+        autoPrevPage();
       }
       break;
     default:                                        // Function key

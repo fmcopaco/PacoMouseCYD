@@ -341,7 +341,6 @@ bool FtpServer::processCommand() {
   char path[FTP_CWD_SIZE];
   File Fdir;
   File Ffile;
-  //String dir;
 
   //------------------------ ACCESS CONTROL COMMANDS ------------------------//
 
